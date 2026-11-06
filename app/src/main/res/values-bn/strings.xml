@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="foundation_title">ফাউন্ডেশন</string>
+    <string name="foundation_subtitle">মডিউল ০ · নতুন অ্যাপের ভিত্তি পরীক্ষার বিল্ড</string>
+    <string name="section_components">কম্পোনেন্ট</string>
+    <string name="section_components_sub">বোতাম, ফিল্ড, OTP, টাকা, রসিদ, পাসবই</string>
+    <string name="section_states">সিস্টেম অবস্থা</string>
+    <string name="section_states_sub">লোডিং, খালি, অফলাইন, সেশন শেষ, আপডেট, অনিরাপদ ফোন</string>
+    <string name="section_security">নিরাপত্তা পরীক্ষা</string>
+    <string name="section_security_sub">অ্যাপ লক, স্ক্রিনশট বন্ধ, ফোনের নিরাপত্তা, নিরাপদ সংযোগ</string>
+    <string name="section_settings">চেহারা ও ভাষা</string>
+    <string name="section_settings_sub">লাইট, ডার্ক, সিস্টেম · English, हिन्दी, বাংলা</string>
+    <string name="theme">থিম</string>
+    <string name="theme_light">লাইট</string>
+    <string name="theme_dark">ডার্ক</string>
+    <string name="theme_system">সিস্টেম</string>
+    <string name="language">ভাষা</string>
+    <string name="unlock_title">ASL Wallet লক করা আছে</string>
+    <string name="unlock_prompt_title">ASL Wallet আনলক করুন</string>
+    <string name="unlock_prompt_subtitle">আঙুলের ছাপ বা ফোনের স্ক্রিন লক ব্যবহার করুন</string>
+    <string name="unlock_button">আনলক করুন</string>
+    <string name="no_screen_lock_title">আগে স্ক্রিন লক সেট করুন</string>
+    <string name="no_screen_lock_body">আপনার টাকা নিরাপদ রাখতে ফোনে আঙুলের ছাপ, PIN, প্যাটার্ন বা পাসওয়ার্ড থাকা দরকার।</string>
+    <string name="open_settings">ফোনের সেটিংস খুলুন</string>
+    <string name="unsafe_title">এই ফোন পেমেন্টের জন্য নিরাপদ নয়</string>
+    <string name="unsafe_body">এই ফোনের সিস্টেমে পরিবর্তন (রুট বা পরিবর্তিত সিস্টেম) পাওয়া গেছে। আপনার টাকা সুরক্ষিত রাখতে পেমেন্ট বন্ধ আছে।</string>
+    <string name="contact_support">সহায়তায় যোগাযোগ করুন</string>
+    <string name="continue_uat">তবুও চালিয়ে যান (শুধু UAT বিল্ড)</string>
+    <string name="connection_check">নিরাপদ সংযোগ পরীক্ষা করুন</string>
+    <string name="back">ফিরে যান</string>
+</resources>

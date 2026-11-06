@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Only the private cache folder for bank-account document photos. -->
+<paths>
+    <cache-path name="wallet_docs" path="wallet_docs/" />
+</paths>

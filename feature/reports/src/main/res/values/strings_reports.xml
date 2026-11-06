@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 6.1 Reports tab -->
+    <string name="rp_title">Reports</string>
+    <string name="rp_ledger">Wallet ledger</string>
+    <string name="rp_ledger_sub">This month · In %1$s · Out %2$s</string>
+    <string name="rp_ledger_sub_plain">Every rupee in and out, from every service</string>
+    <string name="rp_service_reports">Service reports</string>
+    <string name="rp_wallet">Wallet</string>
+    <string name="rp_fund_requests">Fund requests</string>
+    <string name="rp_statement">Statement PDF</string>
+
+    <string name="rp_kind_recharge">Recharge</string>
+    <string name="rp_kind_payout">Payout</string>
+    <string name="rp_kind_aeps">AePS</string>
+    <string name="rp_kind_dmt">Money transfer</string>
+    <string name="rp_kind_matm">Micro ATM</string>
+    <string name="rp_kind_pan">PAN card</string>
+    <string name="rp_report_title">%1$s report</string>
+
+    <!-- lists -->
+    <string name="rp_all">All</string>
+    <string name="rp_money_in">Money in</string>
+    <string name="rp_money_out">Money out</string>
+    <string name="rp_success">Success</string>
+    <string name="rp_pending">Pending</string>
+    <string name="rp_failed">Failed</string>
+    <string name="rp_refunded">Refunded</string>
+    <string name="rp_today">Today</string>
+    <string name="rp_entries">%1$d entries</string>
+    <string name="rp_count_amount">%1$d · %2$s</string>
+    <string name="rp_count">%1$d</string>
+    <string name="rp_bal">Bal %1$s</string>
+    <string name="rp_loading_more">Loading more…</string>
+    <string name="rp_search">Search</string>
+    <string name="rp_search_hint_ledger">Txn ID, number or words</string>
+    <string name="rp_search_hint_recharge">Mobile / subscriber no. or txn ID</string>
+    <string name="rp_search_hint_payout">Txn ID</string>
+    <string name="rp_search_hint_aeps">RRN or txn ID</string>
+    <string name="rp_search_hint_dmt">Txn ID, account or recipient mobile</string>
+    <string name="rp_search_hint_pan">Txn ID</string>
+    <string name="rp_search_min">Type at least 3 characters</string>
+    <string name="rp_filter">Filter</string>
+    <string name="rp_reset">Reset</string>
+    <string name="rp_date">Date</string>
+    <string name="rp_status">Status</string>
+    <string name="rp_show_results">Show results</string>
+    <string name="rp_from">From</string>
+    <string name="rp_to">To</string>
+    <string name="rp_ok">OK</string>
+    <string name="rp_cancel">Cancel</string>
+    <string name="rp_p_today">Today</string>
+    <string name="rp_p_yesterday">Yesterday</string>
+    <string name="rp_p_7">7 days</string>
+    <string name="rp_p_this_month">This month</string>
+    <string name="rp_p_last_month">Last month</string>
+    <string name="rp_p_3_months">Last 3 months</string>
+    <string name="rp_p_custom">Custom</string>
+    <string name="rp_err_from_after">The start date is after the end date</string>
+    <string name="rp_err_future">The end date can\'t be in the future</string>
+    <string name="rp_err_long">Pick up to 3 months at a time</string>
+    <string name="rp_err_old">This report goes back 3 months only</string>
+    <string name="rp_t_amount">Amount</string>
+    <string name="rp_t_commission">Commission</string>
+    <string name="rp_t_withdrawn">Withdrawn</string>
+    <string name="rp_t_failed_refunded">Failed · refunded</string>
+
+    <!-- empty / error -->
+    <string name="rp_empty_title">Nothing in this period</string>
+    <string name="rp_empty_msg">Try a longer period, or check the filters.</string>
+    <string name="rp_empty_this_month">Show this month</string>
+    <string name="rp_clear_filters">Clear filters</string>
+    <string name="rp_cant_refresh">Couldn\'t refresh</string>
+    <string name="rp_showing_from">Showing what loaded at %1$s.</string>
+    <string name="rp_try_again">Try again</string>
+    <string name="rp_offline">You\'re offline. Check your internet.</string>
+    <string name="rp_timeout">The server is taking too long. Try again.</string>
+    <string name="rp_generic">Couldn\'t load the report. Try again.</string>
+    <string name="rp_dmt_note">Uses the money transfer report for your account only. The customer\'s name shows once the server sends it.</string>
+
+    <!-- 6.3 ledger entry -->
+    <string name="rp_entry">Ledger entry</string>
+    <string name="rp_description">Description</string>
+    <string name="rp_opening">Opening balance</string>
+    <string name="rp_closing">Closing balance</string>
+    <string name="rp_debit">Debit</string>
+    <string name="rp_credit">Credit</string>
+    <string name="rp_entry_id">Entry ID</string>
+    <string name="rp_reference">Reference</string>
+    <string name="rp_share">Share</string>
+    <string name="rp_save_pdf">Save PDF</string>
+    <string name="rp_share_title">Share</string>
+
+    <!-- 6.14–6.17 receipt and complaint -->
+    <string name="rp_receipt">Receipt</string>
+    <string name="rp_receipt_note">Computer-generated receipt · no signature needed</string>
+    <string name="rp_complaint">Complaint</string>
+    <string name="rp_complaint_title">Complaint about this transaction</string>
+    <string name="rp_complaint_what">What went wrong?</string>
+    <string name="rp_c_not_received">Customer didn\'t receive it</string>
+    <string name="rp_c_pending">Pending too long</string>
+    <string name="rp_c_wrong">Wrong details</string>
+    <string name="rp_c_other">Other</string>
+    <string name="rp_complaint_details">Details</string>
+    <string name="rp_complaint_count">%1$d / %2$d</string>
+    <string name="rp_send_complaint">Send complaint</string>
+    <string name="rp_complaint_sent">Complaint sent. ASL\'s reply will show here.</string>
+    <string name="rp_complaint_raised">Complaint raised</string>
+    <string name="rp_asl_checking">ASL is checking</string>
+    <string name="rp_asl_reply">ASL replied</string>
+    <string name="rp_reply_here">Their reply shows here</string>
+    <string name="rp_pending_title">Don\'t repeat this transaction</string>
+    <string name="rp_pending_msg">Pending transactions finish, or are refunded to your wallet automatically.</string>
+    <string name="rp_done">Done</string>
+
+    <!-- fields -->
+    <string name="rp_f_operator">Operator</string>
+    <string name="rp_f_number">Number</string>
+    <string name="rp_f_subscriber">Subscriber ID</string>
+    <string name="rp_f_operator_ref">Operator ref</string>
+    <string name="rp_f_customer">Customer</string>
+    <string name="rp_f_recipient">Recipient</string>
+    <string name="rp_f_bank">Bank</string>
+    <string name="rp_f_account">Account</string>
+    <string name="rp_f_ifsc">IFSC</string>
+    <string name="rp_f_mode">Mode</string>
+    <string name="rp_f_charge">Charge</string>
+    <string name="rp_f_utr">Bank ref (UTR)</string>
+    <string name="rp_f_order">Order ID</string>
+    <string name="rp_f_type">Type</string>
+    <string name="rp_f_aadhaar">Aadhaar</string>
+    <string name="rp_f_rrn">RRN</string>
+    <string name="rp_f_balance">Customer balance</string>
+    <string name="rp_f_card">Card</string>
+    <string name="rp_f_mobile">Mobile</string>
+    <string name="rp_f_applicant">Applicant</string>
+    <string name="rp_f_pan_type">PAN type</string>
+    <string name="rp_f_pan_mode">PAN mode</string>
+    <string name="rp_f_application">Application no.</string>
+    <string name="rp_f_refund">Refund</string>
+    <string name="rp_f_txn">ASL Txn ID</string>
+    <string name="rp_f_date">Date</string>
+    <string name="rp_f_commission">Your commission</string>
+    <string name="rp_f_reason">Reason</string>
+
+    <!-- 6.5 statement -->
+    <string name="rp_period">Period</string>
+    <string name="rp_make_pdf">Make PDF</string>
+    <string name="rp_statement_note">Up to 3 months at a time · takes a few seconds</string>
+    <string name="rp_statement_doc_title">Wallet statement</string>
+    <string name="rp_statement_period">%1$s to %2$s</string>
+    <string name="rp_statement_ready">Statement ready: %1$d entries</string>
+    <string name="rp_statement_truncated">Only the first %1$d entries fit. Pick a shorter period for the rest.</string>
+    <string name="rp_statement_empty">No wallet entries in this period.</string>
+    <string name="rp_h_date">Date</string>
+    <string name="rp_h_entry">Entry</string>
+    <string name="rp_h_dr">Debit</string>
+    <string name="rp_h_cr">Credit</string>
+    <string name="rp_h_bal">Balance</string>
+    <string name="rp_opening_short">Opening balance</string>
+    <string name="rp_closing_short">Closing balance · totals</string>
+    <string name="rp_statement_footer">Computer-generated statement from the ASL Wallet app.</string>
+</resources>

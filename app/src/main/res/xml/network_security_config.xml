@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- No cleartext anywhere. Trust only system CAs (user-installed CAs are ignored, so proxies like Burp
+     can't intercept). Certificate pinning is enforced in OkHttp (core:network). -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

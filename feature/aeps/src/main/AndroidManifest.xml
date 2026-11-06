@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Banks and NPCI require the shop's real location on every AEPS request. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- Android 11+ package visibility: only the UIDAI RD services AEPS talks to, and the Play Store. -->
+    <queries>
+        <intent><action android:name="in.gov.uidai.rdservice.fp.CAPTURE" /></intent>
+        <intent><action android:name="in.gov.uidai.rdservice.face.CAPTURE" /></intent>
+        <intent><action android:name="android.media.action.IMAGE_CAPTURE" /></intent>
+        <package android:name="com.mantra.mfs110.rdservice" />
+        <package android:name="com.idemia.l1rdservice" />
+        <package android:name="com.acpl.registersdk_l1" />
+        <package android:name="in.gov.uidai.facerd" />
+        <package android:name="com.android.vending" />
+    </queries>
+
+    <application>
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.aepsfiles"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/aeps_file_paths" />
+        </provider>
+    </application>
+</manifest>

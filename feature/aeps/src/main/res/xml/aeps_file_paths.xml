@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Only the private cache folder for AEPS document photos is shared with the camera app. -->
+<paths>
+    <cache-path name="aeps_docs" path="aeps_docs/" />
+</paths>

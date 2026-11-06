@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="foundation_title">फ़ाउंडेशन</string>
+    <string name="foundation_subtitle">मॉड्यूल 0 · नए ऐप के आधार की जाँच के लिए बिल्ड</string>
+    <string name="section_components">कंपोनेंट</string>
+    <string name="section_components_sub">बटन, फ़ील्ड, OTP, पैसा, रसीद, पासबुक</string>
+    <string name="section_states">सिस्टम स्थितियाँ</string>
+    <string name="section_states_sub">लोडिंग, खाली, ऑफ़लाइन, सत्र समाप्त, अपडेट, असुरक्षित फ़ोन</string>
+    <string name="section_security">सुरक्षा जाँच</string>
+    <string name="section_security_sub">ऐप लॉक, स्क्रीनशॉट ब्लॉक, फ़ोन सुरक्षा, सुरक्षित कनेक्शन</string>
+    <string name="section_settings">रूप और भाषा</string>
+    <string name="section_settings_sub">लाइट, डार्क, सिस्टम · English, हिन्दी, বাংলা</string>
+    <string name="theme">थीम</string>
+    <string name="theme_light">लाइट</string>
+    <string name="theme_dark">डार्क</string>
+    <string name="theme_system">सिस्टम</string>
+    <string name="language">भाषा</string>
+    <string name="unlock_title">ASL Wallet लॉक है</string>
+    <string name="unlock_prompt_title">ASL Wallet अनलॉक करें</string>
+    <string name="unlock_prompt_subtitle">फ़िंगरप्रिंट या फ़ोन का स्क्रीन लॉक इस्तेमाल करें</string>
+    <string name="unlock_button">अनलॉक करें</string>
+    <string name="no_screen_lock_title">पहले स्क्रीन लॉक सेट करें</string>
+    <string name="no_screen_lock_body">आपका पैसा सुरक्षित रखने के लिए फ़ोन में फ़िंगरप्रिंट, PIN, पैटर्न या पासवर्ड होना ज़रूरी है।</string>
+    <string name="open_settings">फ़ोन सेटिंग खोलें</string>
+    <string name="unsafe_title">यह फ़ोन भुगतान के लिए सुरक्षित नहीं है</string>
+    <string name="unsafe_body">इस फ़ोन के सिस्टम में बदलाव (रूट या बदला हुआ सिस्टम) मिला है। आपके पैसे की सुरक्षा के लिए भुगतान बंद हैं।</string>
+    <string name="contact_support">सहायता से संपर्क करें</string>
+    <string name="continue_uat">फिर भी जारी रखें (केवल UAT बिल्ड)</string>
+    <string name="connection_check">सुरक्षित कनेक्शन जाँचें</string>
+    <string name="back">वापस</string>
+</resources>

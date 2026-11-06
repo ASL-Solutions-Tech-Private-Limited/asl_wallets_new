@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="foundation_title">Foundation</string>
+    <string name="foundation_subtitle">Module 0 · build for testing the base of the new app</string>
+    <string name="section_components">Components</string>
+    <string name="section_components_sub">Buttons, fields, OTP, money, receipt, passbook</string>
+    <string name="section_states">System states</string>
+    <string name="section_states_sub">Loading, empty, offline, session expired, update, unsafe phone</string>
+    <string name="section_security">Security checks</string>
+    <string name="section_security_sub">App lock, screenshot block, phone safety, secure connection</string>
+    <string name="section_settings">Appearance and language</string>
+    <string name="section_settings_sub">Light, dark, system · English, हिन्दी, বাংলা</string>
+    <string name="theme">Theme</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_system">System</string>
+    <string name="language">Language</string>
+    <string name="unlock_title">ASL Wallet is locked</string>
+    <string name="unlock_prompt_title">Unlock ASL Wallet</string>
+    <string name="unlock_prompt_subtitle">Use your fingerprint or phone screen lock</string>
+    <string name="unlock_button">Unlock</string>
+    <string name="no_screen_lock_title">Set a screen lock first</string>
+    <string name="no_screen_lock_body">To keep your money safe, ASL Wallet needs your phone to have a fingerprint, PIN, pattern or password.</string>
+    <string name="open_settings">Open phone settings</string>
+    <string name="unsafe_title">This phone isn\'t safe for payments</string>
+    <string name="unsafe_body">We found changes to this phone\'s system (root or a modified system). To protect your money, payments are turned off.</string>
+    <string name="contact_support">Contact support</string>
+    <string name="continue_uat">Continue anyway (UAT build only)</string>
+    <string name="connection_check">Check secure connection</string>
+    <string name="back">Back</string>
+</resources>

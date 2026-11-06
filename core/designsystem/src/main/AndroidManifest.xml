@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Receipt PDFs (AEPS, Send to bank) are shared from the private cache; nothing is written to storage. -->
+        <provider
+            android:name="com.asl.wallet.core.designsystem.receipt.ReceiptFileProvider"
+            android:authorities="${applicationId}.receipts"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/receipt_file_paths" />
+        </provider>
+    </application>
+</manifest>

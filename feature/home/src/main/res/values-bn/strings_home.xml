@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_greeting_morning">সুপ্রভাত</string>
+    <string name="home_greeting_afternoon">নমস্কার</string>
+    <string name="home_greeting_evening">শুভ সন্ধ্যা</string>
+    <string name="home_notifications">বিজ্ঞপ্তি</string>
+    <string name="home_wallet_title">ওয়ালেট ব্যালান্স</string>
+    <string name="home_show">দেখান</string>
+    <string name="home_hide">লুকান</string>
+    <string name="home_show_balance">ব্যালান্স দেখান</string>
+    <string name="home_hide_balance">ব্যালান্স লুকান</string>
+    <string name="home_balance_hidden">ব্যালান্স লুকানো আছে</string>
+    <string name="home_balance_is">ব্যালান্স %1$s</string>
+    <string name="home_updated_now">এইমাত্র আপডেট হয়েছে</string>
+    <string name="home_updated_min">%1$d মিনিট আগে আপডেট হয়েছে</string>
+    <string name="home_updated_at">%1$s-এ আপডেট হয়েছে</string>
+    <string name="home_commission">%1$s কমিশন</string>
+    <string name="home_add_money">টাকা যোগ করুন</string>
+    <string name="home_passbook">পাসবুক</string>
+    <string name="home_open_wallet">ওয়ালেট খুলুন</string>
+    <string name="home_services">পরিষেবা</string>
+    <string name="home_edit">বদলান</string>
+    <string name="home_all_services">সব পরিষেবা</string>
+    <string name="home_recent">সাম্প্রতিক লেনদেন</string>
+    <string name="home_see_all">সব দেখুন</string>
+    <string name="home_recent_empty">এখনও কোনো লেনদেন নেই</string>
+    <string name="home_recent_error">লেনদেন লোড হয়নি। আবার চেষ্টা করতে নিচে টানুন।</string>
+    <string name="home_offline_title">আপনি অফলাইন</string>
+    <string name="home_offline_msg">আপনার শেষ সংরক্ষিত ব্যালান্স দেখানো হচ্ছে। অনলাইনে না ফেরা পর্যন্ত পেমেন্ট বন্ধ।</string>
+    <string name="home_error_title">আপনার ব্যালান্স লোড হয়নি</string>
+    <string name="home_error_msg">ইন্টারনেট দেখে আবার চেষ্টা করুন।</string>
+    <string name="home_retry">আবার চেষ্টা করুন</string>
+    <string name="home_credit">জমা</string>
+    <string name="home_debit">খরচ</string>
+
+    <string name="home_sheet_partner_title">পার্টনারের ওয়েবসাইট খুলবে</string>
+    <string name="home_sheet_partner_msg">একটি সুরক্ষিত ব্রাউজার ট্যাবে। ASL Wallet এখানে সাইন ইন থাকে এবং সাইটের সঙ্গে কোনো লগইন তথ্য শেয়ার করে না।</string>
+    <string name="home_sheet_partner_open">%1$s খুলুন</string>
+    <string name="home_sheet_soon_title">%1$s শীঘ্রই আসছে</string>
+    <string name="home_sheet_soon_msg">নতুন অ্যাপে এটি আবার তৈরি করা হচ্ছে। ততদিন এই পরিষেবার জন্য বর্তমান ASL অ্যাপ ব্যবহার করুন।</string>
+    <string name="home_ok">ঠিক আছে</string>
+    <string name="home_cancel">বাতিল</string>
+    <string name="home_no_browser">এই সাইট খোলার জন্য কোনো ব্রাউজার পাওয়া যায়নি।</string>
+
+    <string name="home_search_hint">পরিষেবা খুঁজুন</string>
+    <string name="home_search_empty">\"%1$s\"-এর সঙ্গে কোনো পরিষেবা মেলেনি</string>
+    <string name="home_search_empty_hint">অন্য শব্দ দিয়ে খুঁজুন, যেমন “রিচার্জ” বা “AEPS”।</string>
+    <string name="home_offline_list">অ্যাপের নিজস্ব তালিকা দেখানো হচ্ছে। কিছু পরিষেবা আলাদা হতে পারে।</string>
+    <string name="group_banking">ব্যাংকিং</string>
+    <string name="group_bills">রিচার্জ ও বিল</string>
+    <string name="group_more">নথি, ভ্রমণ, উপহার</string>
+    <string name="tag_soon">শীঘ্রই</string>
+    <string name="tag_web">ওয়েব</string>
+
+    <string name="home_edit_title">হোমের পরিষেবা বদলান</string>
+    <string name="home_edit_hint">সর্বোচ্চ %1$dটি বাছুন। যে ক্রমে বাছবেন, হোমে সেই ক্রমে দেখাবে।</string>
+    <string name="home_edit_count">%2$dটির মধ্যে %1$dটি বাছা হয়েছে</string>
+    <string name="home_save">সংরক্ষণ করুন</string>
+    <string name="home_reset">ডিফল্টে ফেরান</string>
+
+    <string name="notif_empty_title">এখনও কোনো বিজ্ঞপ্তি নেই</string>
+    <string name="notif_empty_msg">অফার, KYC আপডেট ও পরিষেবার সতর্কতা এখানে দেখাবে।</string>
+
+    <string name="tab_home">হোম</string>
+    <string name="tab_reports">রিপোর্ট</string>
+    <string name="tab_earnings">আয়</string>
+    <string name="tab_profile">প্রোফাইল</string>
+    <string name="tab_soon_title">%1$s শীঘ্রই আসছে</string>
+    <string name="tab_soon_msg">এই অংশটি নতুন অ্যাপের পরের আপডেটে আসবে।</string>
+    <string name="tab_logout">লগ আউট</string>
+    <string name="logout_title">লগ আউট করবেন?</string>
+    <string name="logout_msg">আবার সাইন ইন করতে আপনার পাসওয়ার্ড লাগবে।</string>
+
+    <string name="dist_network">আমার নেটওয়ার্ক</string>
+    <string name="dist_retailers">আমার রিটেলার</string>
+    <string name="dist_fund">ফান্ড ট্রান্সফার</string>
+    <string name="dist_add">রিটেলার যোগ করুন</string>
+    <string name="dist_report">নেটওয়ার্ক রিপোর্ট</string>
+</resources>

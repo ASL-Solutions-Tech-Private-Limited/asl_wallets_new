@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_greeting_morning">Good morning</string>
+    <string name="home_greeting_afternoon">Good afternoon</string>
+    <string name="home_greeting_evening">Good evening</string>
+    <string name="home_notifications">Notifications</string>
+    <string name="home_wallet_title">Wallet balance</string>
+    <string name="home_show">Show</string>
+    <string name="home_hide">Hide</string>
+    <string name="home_show_balance">Show balance</string>
+    <string name="home_hide_balance">Hide balance</string>
+    <string name="home_balance_hidden">Balance hidden</string>
+    <string name="home_balance_is">Balance %1$s</string>
+    <string name="home_updated_now">Updated just now</string>
+    <string name="home_updated_min">Updated %1$d min ago</string>
+    <string name="home_updated_at">Updated %1$s</string>
+    <string name="home_commission">%1$s commission</string>
+    <string name="home_add_money">Add money</string>
+    <string name="home_passbook">Passbook</string>
+    <string name="home_open_wallet">Open wallet</string>
+    <string name="home_services">Services</string>
+    <string name="home_edit">Edit</string>
+    <string name="home_all_services">All services</string>
+    <string name="home_recent">Recent transactions</string>
+    <string name="home_see_all">See all</string>
+    <string name="home_recent_empty">No transactions yet</string>
+    <string name="home_recent_error">Couldn\'t load transactions. Pull down to try again.</string>
+    <string name="home_offline_title">You\'re offline</string>
+    <string name="home_offline_msg">Showing your last saved balance. Payments are paused until you\'re back online.</string>
+    <string name="home_error_title">Couldn\'t load your balance</string>
+    <string name="home_error_msg">Check your internet and try again.</string>
+    <string name="home_retry">Try again</string>
+    <string name="home_credit">Credit</string>
+    <string name="home_debit">Debit</string>
+
+    <string name="home_sheet_partner_title">Opens the partner\'s website</string>
+    <string name="home_sheet_partner_msg">In a secure browser tab. ASL Wallet stays signed in here and shares no login details with the site.</string>
+    <string name="home_sheet_partner_open">Open %1$s</string>
+    <string name="home_sheet_soon_title">%1$s is coming soon</string>
+    <string name="home_sheet_soon_msg">It\'s being rebuilt in the new app. Until then, use the current ASL app for this service.</string>
+    <string name="home_ok">OK</string>
+    <string name="home_cancel">Cancel</string>
+    <string name="home_no_browser">No browser found to open this site.</string>
+
+    <string name="home_search_hint">Search services</string>
+    <string name="home_search_empty">No service matches \"%1$s\"</string>
+    <string name="home_search_empty_hint">Try another word, like “recharge” or “AEPS”.</string>
+    <string name="home_offline_list">Showing the built-in list. Some services may differ.</string>
+    <string name="group_banking">Banking</string>
+    <string name="group_bills">Recharge and bills</string>
+    <string name="group_more">Documents, travel, gifts</string>
+    <string name="tag_soon">Soon</string>
+    <string name="tag_web">Web</string>
+
+    <string name="home_edit_title">Edit Home services</string>
+    <string name="home_edit_hint">Pick up to %1$d. They show on Home in the order you pick them.</string>
+    <string name="home_edit_count">%1$d of %2$d selected</string>
+    <string name="home_save">Save</string>
+    <string name="home_reset">Reset to default</string>
+
+    <string name="notif_empty_title">No notifications yet</string>
+    <string name="notif_empty_msg">Offers, KYC updates and service alerts will show here.</string>
+
+    <string name="tab_home">Home</string>
+    <string name="tab_reports">Reports</string>
+    <string name="tab_earnings">Earnings</string>
+    <string name="tab_profile">Profile</string>
+    <string name="tab_soon_title">%1$s is coming soon</string>
+    <string name="tab_soon_msg">This section arrives in a later update of the new app.</string>
+    <string name="tab_logout">Log out</string>
+    <string name="logout_title">Log out?</string>
+    <string name="logout_msg">You\'ll need your password to sign in again.</string>
+
+    <string name="dist_network">My network</string>
+    <string name="dist_retailers">My retailers</string>
+    <string name="dist_fund">Fund transfer</string>
+    <string name="dist_add">Add retailer</string>
+    <string name="dist_report">Network report</string>
+</resources>

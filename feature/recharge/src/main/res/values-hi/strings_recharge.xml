@@ -107,4 +107,6 @@
     <string name="r_offline">इंटरनेट नहीं है। कनेक्शन जाँचकर फिर कोशिश करें।</string>
     <string name="r_timeout">सर्वर ने बहुत देर लगाई। फिर कोशिश करें।</string>
     <string name="r_generic">कुछ गड़बड़ हुई। फिर कोशिश करें।</string>
+    <!-- Voice after the receipt -->
+    <string name="r_voice">%1$s रिचार्ज %2$s रुपये का सफल।</string>
 </resources>

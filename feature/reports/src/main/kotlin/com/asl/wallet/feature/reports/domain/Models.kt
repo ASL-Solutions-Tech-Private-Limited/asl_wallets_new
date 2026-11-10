@@ -131,6 +131,8 @@ enum class ReportKind(
     Dmt("dmt-transaction-report", "tranStatus", "FAIL", null, 0),
     Matm("merchant/matm-report", null, null, "merchant/matm-report/complain", 250, lookbackLimited = true),
     Pan("merchant/pan-report", null, null, "merchant/pan-report/complain", 250, lookbackLimited = true),
+    /** Wallet top-ups by PayU. Like the PayU routes it has no `/app` prefix (UAT, 10 Nov 2026), so the path is absolute. */
+    AddMoney("/api/v1/merchant/add-money-report", null, null, null, 0),
     ;
 
     val hasStatusFilter: Boolean get() = statusParam != null
@@ -143,6 +145,7 @@ enum class ReportKind(
             // ASL txn IDs are 16 characters; mobile and DTH numbers are 10–12.
             Recharge -> if (t.length >= 14) "tranId" else "rechargeNo"
             Payout, Pan -> "servid"
+            AddMoney -> "search"
             Aeps, Matm -> if (digits && t.length == 12) "bankRrn" else "tranId"
             Dmt -> when {
                 digits && t.length == 10 -> "mobileNumber"
@@ -191,7 +194,7 @@ data class ReportRow(
     val receiptFields: List<Pair<Field, String>> get() = fields.filter { it.first.customer }
 }
 
-enum class TotalKind { Amount, Commission, Charges, MoneyIn, MoneyOut, Success, Failed }
+enum class TotalKind { Amount, Commission, Charges, MoneyIn, MoneyOut, Success, Failed, Pending }
 
 data class Summary(val count: Int?, val totals: List<Pair<TotalKind, BigDecimal>>)
 

@@ -1,5 +1,7 @@
 package com.asl.wallet.feature.recharge.ui
 
+import com.asl.wallet.core.designsystem.component.keyboardAware
+import androidx.compose.foundation.layout.imePadding
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -71,7 +73,8 @@ import com.asl.wallet.core.designsystem.component.KeyValueList
 import com.asl.wallet.core.designsystem.component.ListCard
 import com.asl.wallet.core.designsystem.component.ListRow
 import com.asl.wallet.core.designsystem.component.ProcessingScreen
-import com.asl.wallet.core.designsystem.component.ReceiptActionBar
+import com.asl.wallet.core.designsystem.component.BillLabels
+import com.asl.wallet.core.designsystem.component.BillReceipt
 import com.asl.wallet.core.designsystem.component.ReceiptCard
 import com.asl.wallet.core.designsystem.component.ResultKind
 import com.asl.wallet.core.designsystem.component.ResultView
@@ -117,7 +120,7 @@ private fun Scaffold(
 ) {
     val c = AslTheme.colors
     if (secure) SecureScreen()
-    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding()) {
+    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding().keyboardAware()) {
         AslTopBar(title, onBack = onBack, closeIcon = close)
         Column(
             Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 16.dp)
@@ -143,7 +146,7 @@ private fun Note(text: String) = Text(text, style = AslTheme.type.caption, color
 @Composable
 private fun Sheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = AslTheme.colors.surface, shape = AslShapes.sheet) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp).padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
+        Column(Modifier.fillMaxWidth().imePadding().navigationBarsPadding().padding(horizontal = 16.dp).padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
     }
 }
 
@@ -349,7 +352,7 @@ private fun OperatorSheet(ops: List<Operator>, loading: Boolean, current: Operat
 private fun PlansPage(s: RechargeState, vm: RechargeViewModel) {
     val c = AslTheme.colors
     var details by remember { mutableStateOf<Plan?>(null) }
-    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding()) {
+    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding().keyboardAware()) {
         AslTopBar(stringResource(R.string.r_plans_title, s.operator?.name.orEmpty()), onBack = vm::closePlans)
         Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             AslTextField(s.planQuery, vm::onPlanQuery, stringResource(R.string.r_search_plans), trailingIcon = AslIcons.Search)
@@ -372,7 +375,7 @@ private fun PlansPage(s: RechargeState, vm: RechargeViewModel) {
                 }
             }
             s.visiblePlans.isEmpty() -> Column(Modifier.padding(16.dp)) { Note(stringResource(if (s.plans.isEmpty()) R.string.r_no_plans else R.string.r_no_plan_match)) }
-            else -> LazyColumn(Modifier.fillMaxWidth().navigationBarsPadding(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            else -> LazyColumn(Modifier.fillMaxWidth().imePadding().navigationBarsPadding(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(s.visiblePlans, key = { "${it.category}-${it.amount}-${it.validity}" }) { p -> PlanCard(p, onClick = { details = p }) }
             }
         }
@@ -442,58 +445,48 @@ private fun ReviewPage(s: RechargeState, vm: RechargeViewModel, onAddMoney: () -
 
 @Composable
 private fun ResultPage(s: RechargeState, vm: RechargeViewModel, shop: ShopInfo, onHome: () -> Unit, onCall: () -> Unit, onWhatsApp: () -> Unit) {
-    val context = LocalContext.current
     val title = stringResource(R.string.r_receipt)
     BackHandler { vm.again(keepDetails = false) }
-    when (val o = s.outcome) {
-        is RechargeOutcome.Done -> {
-            val doc = receiptDoc(o.receipt)
-            var printChoice by remember { mutableStateOf(false) }
-            val shareTitle = stringResource(R.string.r_share_title)
-            Scaffold(title, { vm.again(false) }, secure = true, close = true, bottom = {
+    val o = s.outcome ?: return
+    // Every outcome prints the same bill as Reports, stamped Success / Pending / Failed.
+    val (status, word) = when (o) {
+        is RechargeOutcome.Done -> Status.Success to stringResource(R.string.r_success)
+        is RechargeOutcome.Pending -> Status.Pending to stringResource(R.string.r_pending)
+        is RechargeOutcome.Failed -> Status.Failed to stringResource(R.string.r_failed)
+    }
+    val receipt = when (o) { is RechargeOutcome.Done -> o.receipt; is RechargeOutcome.Pending -> o.receipt; is RechargeOutcome.Failed -> o.receipt }
+    val extra = if (o is RechargeOutcome.Failed) listOf(
+        stringResource(R.string.r_amount) to stringResource(if (o.debited) R.string.r_returned else R.string.r_not_taken, rupees(receipt.amount)),
+        stringResource(R.string.r_reason) to (o.reason?.let(::safeServerMessage) ?: stringResource(R.string.r_reason_unknown)),
+    ) else emptyList()
+    val doc = receiptDoc(receipt, word, extra)
+    Scaffold(title, { vm.again(false) }, secure = true, close = o is RechargeOutcome.Done, bottom = {
+        when (o) {
+            is RechargeOutcome.Done -> {
                 AslPrimaryButton(stringResource(R.string.r_another), { vm.again(false) })
                 AslButton(stringResource(R.string.r_home), onHome, Modifier.fillMaxWidth(), style = AslButtonStyle.Outline, icon = AslIcons.Home)
-            }) {
-                val labels = listOf(stringResource(R.string.r_share), stringResource(R.string.r_pdf), stringResource(R.string.r_print), stringResource(R.string.r_help))
-                ReceiptCard(shop, doc.title, rupees(o.receipt.amount), Status.Success, doc.rows.map { KeyValue(it.first, it.second) }, footer = doc.footer,
-                    statusLabel = stringResource(R.string.r_success), amountWords = AmountInWords.english(o.receipt.amount), barcodeSeed = o.receipt.txnId, animate = true) {
-                    ReceiptActionBar(
-                        onWhatsApp = { ReceiptExport.shareText(context, shareTitle, ReceiptExport.text(shop, doc)) },
-                        onSavePdf = { ReceiptExport.sharePdf(context, shop, doc, shareTitle, "ASL-recharge.pdf") },
-                        onPrint = { printChoice = true }, onHelp = onCall, labels = labels,
-                    )
-                }
             }
-            if (printChoice) Sheet({ printChoice = false }) {
-                Text(stringResource(R.string.r_print_title), style = AslTheme.type.title, color = AslTheme.colors.textPrimary)
-                ListCard {
-                    ListRow(stringResource(R.string.r_print_thermal), icon = AslIcons.Print, onClick = { printChoice = false; context.findActivity()?.let { ReceiptExport.print(it, shareTitle, ReceiptExport.html(shop, doc, true), true) } }); Divider()
-                    ListRow(stringResource(R.string.r_print_a4), icon = AslIcons.Document, onClick = { printChoice = false; context.findActivity()?.let { ReceiptExport.print(it, shareTitle, ReceiptExport.html(shop, doc, false), false) } })
-                }
+            is RechargeOutcome.Pending -> AslPrimaryButton(stringResource(R.string.r_back_recharge), { vm.again(false) })
+            is RechargeOutcome.Failed -> {
+                AslPrimaryButton(stringResource(R.string.r_try_again), { vm.again(keepDetails = true) })
+                AslButton(stringResource(R.string.r_home), onHome, Modifier.fillMaxWidth(), style = AslButtonStyle.Outline)
             }
         }
-        is RechargeOutcome.Pending -> Scaffold(title, null, secure = true, bottom = {
-            AslPrimaryButton(stringResource(R.string.r_back_recharge), { vm.again(false) })
-        }) {
-            ResultView(ResultKind.Warn, stringResource(R.string.r_pending_title), stringResource(R.string.r_pending_sub, o.receipt.operator), listOfNotNull(
-                KeyValue(stringResource(if (o.receipt.type == RechargeType.Mobile) R.string.r_mobile else R.string.r_subscriber_id), masked(o.receipt)),
-                KeyValue(stringResource(R.string.r_amount), rupees(o.receipt.amount)),
-                o.receipt.txnId?.let { KeyValue(stringResource(R.string.r_txn_id), it) },
-            ))
+    }) {
+        BillReceipt(
+            shop, doc, status,
+            BillLabels(
+                listOf(stringResource(R.string.r_share), stringResource(R.string.r_pdf), stringResource(R.string.r_print), stringResource(R.string.r_help)),
+                stringResource(R.string.r_share_title), stringResource(R.string.r_print_title), stringResource(R.string.r_print_thermal), stringResource(R.string.r_print_a4),
+            ),
+            fileName = "ASL-recharge.pdf", onHelp = onCall,
+            amountWords = AmountInWords.english(receipt.amount), barcodeSeed = receipt.txnId,
+            voice = if (o is RechargeOutcome.Done) stringResource(R.string.r_voice, receipt.operator, com.asl.wallet.core.designsystem.component.spokenRupees(receipt.amount)) else null,
+        )
+        if (o is RechargeOutcome.Pending) {
             AlertBanner(AlertKind.Pending, stringResource(R.string.r_held), message = stringResource(R.string.r_held_msg))
             HelpCard(onComplaint = onCall, onWhatsApp = onWhatsApp, onCall = onCall, title = stringResource(R.string.r_need_help))
         }
-        is RechargeOutcome.Failed -> Scaffold(title, null, secure = true, bottom = {
-            AslPrimaryButton(stringResource(R.string.r_try_again), { vm.again(keepDetails = true) })
-            AslButton(stringResource(R.string.r_home), onHome, Modifier.fillMaxWidth(), style = AslButtonStyle.Outline)
-        }) {
-            ResultView(ResultKind.Bad, stringResource(R.string.r_failed_title), stringResource(R.string.r_failed_sub, o.receipt.operator), listOfNotNull(
-                KeyValue(stringResource(if (o.receipt.type == RechargeType.Mobile) R.string.r_mobile else R.string.r_subscriber_id), masked(o.receipt)),
-                KeyValue(stringResource(R.string.r_amount), stringResource(if (o.debited) R.string.r_returned else R.string.r_not_taken, rupees(o.receipt.amount))),
-                KeyValue(stringResource(R.string.r_reason), o.reason?.let(::safeServerMessage) ?: stringResource(R.string.r_reason_unknown)),
-            ))
-        }
-        null -> Unit
     }
 }
 
@@ -501,9 +494,9 @@ private fun masked(r: RechargeReceipt) = if (r.type == RechargeType.Mobile) Mask
 
 /** Shared receipts mask the customer's number. */
 @Composable
-private fun receiptDoc(r: RechargeReceipt) = ReceiptDoc(
+private fun receiptDoc(r: RechargeReceipt, status: String, extra: List<Pair<String, String>> = emptyList()) = ReceiptDoc(
     title = stringResource(if (r.type == RechargeType.Mobile) R.string.r_mobile_recharge else R.string.r_dth_recharge),
-    status = stringResource(R.string.r_success),
+    status = status,
     amount = rupees(r.amount),
     rows = listOfNotNull(
         stringResource(if (r.type == RechargeType.Mobile) R.string.r_mobile else R.string.r_subscriber_id) to masked(r),
@@ -513,6 +506,6 @@ private fun receiptDoc(r: RechargeReceipt) = ReceiptDoc(
         r.operatorRef?.let { stringResource(R.string.r_operator_ref) to it },
         r.txnId?.let { stringResource(R.string.r_txn_id) to it },
         r.time.takeIf { it.isNotBlank() }?.let { stringResource(R.string.r_date) to it },
-    ),
+    ) + extra,
     footer = stringResource(R.string.r_receipt_note),
 )

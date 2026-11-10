@@ -1,11 +1,46 @@
 package com.asl.wallet.core.designsystem.component
 
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
+
+import androidx.compose.ui.platform.LocalDensity
+
+import androidx.compose.foundation.layout.ime
+
+import androidx.compose.foundation.layout.WindowInsets
+
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.lerp
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,8 +80,11 @@ import com.asl.wallet.core.designsystem.theme.AslShapes
 import com.asl.wallet.core.designsystem.theme.AslTheme
 
 /**
- * Text field with the label always visible inside the box (works at "Largest" font size, unlike
- * floating labels). States: default, focused (primary ring), error (red + message), success (green message), locked.
+ * Text field (classic look, refreshed 9 Nov 2026): taller, with a floating label. The label rests large inside an
+ * empty field and glides up when the field is focused or filled, so it is always visible (works at the largest font
+ * size too). Focus: the border turns blue with a soft glow. A leading icon is added for passwords (lock), phone
+ * numbers (phone) and login IDs (person), or pass [leadingIcon]. While typing, a clear button and (with a
+ * [maxLength]) a counter appear. Errors shake the field once and slide in with an icon.
  */
 @Composable
 fun AslTextField(
@@ -59,6 +97,10 @@ fun AslTextField(
     success: String? = null,
     locked: Boolean = false,
     password: Boolean = false,
+    /** How the text is shown (e.g. [GroupedDigits] for Aadhaar); the value itself is unchanged. */
+    display: VisualTransformation? = null,
+    /** Bigger, spaced-out text for numbers that must be read back easily (Aadhaar). */
+    large: Boolean = false,
     keyboardType: KeyboardType = KeyboardType.Text,
     imeAction: ImeAction = ImeAction.Next,
     onImeAction: () -> Unit = {},
@@ -68,30 +110,53 @@ fun AslTextField(
     onTrailingClick: (() -> Unit)? = null,
     trailingLabel: String? = null,
     singleLine: Boolean = true,
+    /** Shown on the left; by default chosen from the field type (null = none). */
+    leadingIcon: ImageVector? = defaultLeading(password, keyboardType),
 ) {
     val c = AslTheme.colors
     var focused by remember { mutableStateOf(false) }
     var reveal by remember { mutableStateOf(false) }
-    val borderColor = when {
-        error != null -> c.error
-        focused -> c.primary
-        else -> c.outline
+    val still = reduceMotion()
+    val spec = if (still) snap<Float>() else tween<Float>(200)
+
+    val floating = focused || value.isNotEmpty()
+    val p by animateFloatAsState(if (floating) 1f else 0f, spec, label = "label")
+    val glow by animateFloatAsState(if (focused && error == null) 1f else 0f, spec, label = "glow")
+    val borderColor by animateColorAsState(
+        when { error != null -> c.error; focused -> c.primaryEnd; locked -> c.outline.copy(alpha = 0.6f); else -> c.outline },
+        if (still) snap() else tween(200), label = "border",
+    )
+    val labelColor by animateColorAsState(
+        when { error != null -> c.error; focused -> c.primaryEnd; else -> c.textSecondary },
+        if (still) snap() else tween(200), label = "labelColor",
+    )
+    // Shake once when an error appears.
+    val shake = remember { Animatable(0f) }
+    LaunchedEffect(error) {
+        if (error != null && !still) for (v in listOf(10f, -8f, 6f, -4f, 2f, 0f)) shake.animateTo(v, tween(45))
     }
-    Column(modifier) {
+    val shape = RoundedCornerShape(14.dp)
+    // Once the keyboard is up, scroll this field (with its error line) into view above it.
+    val inView = remember { BringIntoViewRequester() }
+    val keyboardUp = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    LaunchedEffect(focused, keyboardUp) { if (focused && keyboardUp) { delay(120); inView.bringIntoView() } }
+
+    Column(modifier.bringIntoViewRequester(inView).graphicsLayer { translationX = shake.value * density }) {
         BasicTextField(
             value = value,
             onValueChange = { if (it.length <= maxLength) onValueChange(it) },
             enabled = !locked,
             singleLine = singleLine,
-            textStyle = AslTheme.type.bodyStrong.copy(color = c.textPrimary),
-            cursorBrush = SolidColor(c.primary),
-            visualTransformation = if (password && !reveal) PasswordVisualTransformation() else VisualTransformation.None,
+            textStyle = AslTheme.type.bodyStrong.copy(color = if (locked) c.textSecondary else c.textPrimary)
+                .let { if (large) it.copy(fontSize = 20.sp, letterSpacing = 1.2.sp) else it },
+            cursorBrush = SolidColor(c.primaryEnd),
+            visualTransformation = if (password && !reveal) PasswordVisualTransformation() else display ?: VisualTransformation.None,
             keyboardOptions = KeyboardOptions(
                 keyboardType = if (password) KeyboardType.Password else keyboardType,
                 imeAction = imeAction,
                 autoCorrectEnabled = false,
             ),
-            keyboardActions = KeyboardActions(onAny = { onImeAction() }),
+            keyboardActions = rememberImeActions(imeAction, onImeAction),
             modifier = Modifier
                 .fillMaxWidth()
                 .onFocusChanged { focused = it.isFocused }
@@ -100,17 +165,37 @@ fun AslTextField(
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .then(if (focused && error == null) Modifier.border(4.dp, c.tint, AslShapes.field) else Modifier)
-                        .background(if (locked) c.background else c.surface, AslShapes.field)
-                        .border(1.5.dp, borderColor, AslShapes.field)
-                        .padding(horizontal = 14.dp, vertical = 9.dp),
+                        .heightIn(min = 60.dp)
+                        // Glow drawn just outside the field: edges stay aligned with other components, and it never covers the border.
+                        .drawBehind {
+                            if (glow > 0f) {
+                                val g = 4.dp.toPx()
+                                drawRoundRect(
+                                    c.tint.copy(alpha = glow), topLeft = Offset(-g, -g), size = Size(size.width + 2 * g, size.height + 2 * g),
+                                    cornerRadius = CornerRadius(18.dp.toPx()),
+                                )
+                            }
+                        }
+                        .background(if (locked) c.background else c.surface, shape)
+                        .border(if (focused || error != null) 2.dp else 1.5.dp, borderColor, shape)
+                        .padding(start = if (leadingIcon != null) 12.dp else 16.dp, end = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(label, style = AslTheme.type.caption, color = c.textSecondary)
-                        Box {
-                            if (value.isEmpty() && placeholder.isNotEmpty()) {
-                                Text(placeholder, style = AslTheme.type.body, color = c.textSecondary.copy(alpha = 0.7f))
+                    if (leadingIcon != null) {
+                        Icon(leadingIcon, null, tint = if (focused) c.primaryEnd else c.textSecondary, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(12.dp))
+                    }
+                    Box(Modifier.weight(1f).padding(vertical = 8.dp)) {
+                        // Floating label: large in the middle of an empty field, small on top once focused or filled.
+                        Text(
+                            label,
+                            style = lerp(AslTheme.type.body.copy(fontSize = AslTheme.type.bodyStrong.fontSize), AslTheme.type.caption, p),
+                            color = labelColor, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.graphicsLayer { translationY = (1f - p) * 10.dp.toPx() },
+                        )
+                        Box(Modifier.padding(top = 18.dp).graphicsLayer { alpha = if (floating) 1f else 0f }) {
+                            if (value.isEmpty() && placeholder.isNotEmpty() && floating) {
+                                Text(placeholder, style = AslTheme.type.body, color = c.textSecondary.copy(alpha = 0.6f), maxLines = 1)
                             }
                             inner()
                         }
@@ -119,21 +204,50 @@ fun AslTextField(
                         password -> Icon(
                             if (reveal) AslIcons.EyeOff else AslIcons.Eye,
                             contentDescription = if (reveal) "Hide password" else "Show password",
-                            tint = c.textSecondary,
-                            modifier = Modifier.size(22.dp).clickableNoRipple { reveal = !reveal },
+                            tint = if (reveal) c.primaryEnd else c.textSecondary,
+                            modifier = Modifier.size(40.dp).clip(CircleShape).clickableNoRipple { reveal = !reveal }.padding(9.dp),
                         )
                         locked -> Icon(AslIcons.Lock, contentDescription = "Locked", tint = c.textSecondary, modifier = Modifier.size(20.dp))
-                        trailingIcon != null -> Icon(trailingIcon, contentDescription = trailingLabel, tint = if (onTrailingClick != null) c.primary else c.textSecondary,
-                            modifier = Modifier.size(if (onTrailingClick != null) 24.dp else 20.dp).then(if (onTrailingClick != null) Modifier.clickableNoRipple(onTrailingClick) else Modifier))
+                        trailingIcon != null -> Icon(
+                            trailingIcon, contentDescription = trailingLabel, tint = if (onTrailingClick != null) c.primaryEnd else c.textSecondary,
+                            modifier = Modifier.size(40.dp).clip(CircleShape).then(if (onTrailingClick != null) Modifier.clickableNoRipple(onTrailingClick) else Modifier).padding(9.dp),
+                        )
+                        focused && value.isNotEmpty() -> Icon(
+                            AslIcons.Close, contentDescription = "Clear $label", tint = c.textSecondary,
+                            modifier = Modifier.size(36.dp).clip(CircleShape).clickableNoRipple { onValueChange("") }.padding(10.dp),
+                        )
                     }
                 }
             },
         )
-        when {
-            error != null -> Text(error, style = AslTheme.type.caption, color = c.error, modifier = Modifier.padding(start = 4.dp, top = 4.dp))
-            success != null -> Text("✓ $success", style = AslTheme.type.caption, color = c.success, modifier = Modifier.padding(start = 4.dp, top = 4.dp))
+        val counter = maxLength != Int.MAX_VALUE && maxLength < 1000 && focused
+        AnimatedVisibility(error != null || success != null || counter, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+            Row(Modifier.fillMaxWidth().padding(start = 6.dp, end = 6.dp, top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                when {
+                    error != null -> {
+                        Icon(AslIcons.Alert, null, tint = c.error, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(5.dp))
+                        Text(error, style = AslTheme.type.caption, color = c.error, modifier = Modifier.weight(1f))
+                    }
+                    success != null -> {
+                        Icon(AslIcons.Check, null, tint = c.success, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(5.dp))
+                        Text(success, style = AslTheme.type.caption, color = c.success, modifier = Modifier.weight(1f))
+                    }
+                    else -> Spacer(Modifier.weight(1f))
+                }
+                if (counter) Text("${value.length} / $maxLength", style = AslTheme.type.caption, color = c.textSecondary)
+            }
         }
     }
+}
+
+/** The leading icon a field gets from its type: lock for passwords, phone for numbers, person for login IDs. */
+fun defaultLeading(password: Boolean, keyboardType: KeyboardType): ImageVector? = when {
+    password -> AslIcons.Lock
+    keyboardType == KeyboardType.Phone -> AslIcons.Phone
+    keyboardType == KeyboardType.Email -> AslIcons.User
+    else -> null
 }
 
 /**
@@ -152,14 +266,17 @@ fun OtpInput(
     val c = AslTheme.colors
     val blink = rememberInfiniteTransition(label = "caret")
     val caretAlpha by blink.animateFloat(1f, 0f, infiniteRepeatable(tween(500), RepeatMode.Reverse), label = "caretA")
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     BasicTextField(
         value = value,
         onValueChange = { raw ->
             val digits = raw.filter(Char::isDigit).take(length)
             onValueChange(digits)
-            if (digits.length == length) onComplete(digits)
+            // All digits in: the keyboard goes away so the Verify button shows.
+            if (digits.length == length) { keyboard?.hide(); onComplete(digits) }
         },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
+        keyboardActions = rememberImeActions(ImeAction.Done),
         modifier = modifier.semantics { contentDescription = "One-time code, $length digits" },
         decorationBox = {
             Row(horizontalArrangement = Arrangement.spacedBy(if (length == 6) 8.dp else 10.dp), modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -176,12 +293,19 @@ fun OtpInput(
                         Modifier
                             .size(width = if (length == 6) 42.dp else 52.dp, height = 56.dp)
                             .then(if (isCursor && !isError) Modifier.border(4.dp, c.tint, AslShapes.field) else Modifier)
-                            .background(c.surface, AslShapes.field)
+                            .background(if (ch != null && !isError) c.tint else c.surface, AslShapes.field)
                             .border(1.5.dp, border, AslShapes.field),
                         contentAlignment = Alignment.Center,
                     ) {
                         if (ch != null) {
-                            Text(ch.toString(), style = AslTheme.type.headline, color = c.textPrimary, textAlign = TextAlign.Center)
+                            // Each digit pops in as it is typed (classic look); still when animations are off.
+                            val still = reduceMotion()
+                            val pop = remember { androidx.compose.animation.core.Animatable(if (still) 1f else 0.4f) }
+                            LaunchedEffect(Unit) { pop.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.45f, stiffness = 500f)) }
+                            Text(
+                                ch.toString(), style = AslTheme.type.headline, color = c.textPrimary, textAlign = TextAlign.Center,
+                                modifier = Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value },
+                            )
                         } else if (isCursor) {
                             Box(Modifier.width(2.dp).height(22.dp).alpha(caretAlpha).background(c.primary))
                         }
@@ -191,4 +315,20 @@ fun OtpInput(
             }
         },
     )
+}
+
+/**
+ * Shows digits in groups ("123456781234" → "1234 5678 1234") while the value stays digits only, and keeps the cursor
+ * in the right place across the added spaces.
+ */
+class GroupedDigits(private val group: Int = 4) : VisualTransformation {
+    override fun filter(text: androidx.compose.ui.text.AnnotatedString): androidx.compose.ui.text.input.TransformedText {
+        val raw = text.text
+        val out = buildString { raw.forEachIndexed { i, ch -> if (i > 0 && i % group == 0) append(' '); append(ch) } }
+        val map = object : androidx.compose.ui.text.input.OffsetMapping {
+            override fun originalToTransformed(offset: Int): Int = if (offset <= 0) 0 else (offset + (offset - 1) / group).coerceAtMost(out.length)
+            override fun transformedToOriginal(offset: Int): Int = (offset - offset / (group + 1)).coerceIn(0, raw.length)
+        }
+        return androidx.compose.ui.text.input.TransformedText(androidx.compose.ui.text.AnnotatedString(out), map)
+    }
 }

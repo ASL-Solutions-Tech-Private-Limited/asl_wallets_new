@@ -107,4 +107,6 @@
     <string name="r_offline">No internet. Check your connection and try again.</string>
     <string name="r_timeout">The server took too long. Please try again.</string>
     <string name="r_generic">Something went wrong. Please try again.</string>
+    <!-- Voice after the receipt -->
+    <string name="r_voice">%1$s recharge of %2$s rupees successful.</string>
 </resources>

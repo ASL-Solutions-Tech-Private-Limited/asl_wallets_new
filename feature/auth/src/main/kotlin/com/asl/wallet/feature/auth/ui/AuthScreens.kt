@@ -1,5 +1,7 @@
 package com.asl.wallet.feature.auth.ui
 
+import com.asl.wallet.core.designsystem.component.keyboardAware
+import com.asl.wallet.core.designsystem.component.StatusBarTone
 import android.content.Intent
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
@@ -14,11 +16,15 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -103,12 +109,14 @@ private fun AuroraBox(modifier: Modifier = Modifier, content: @Composable BoxSco
     val t = rememberInfiniteTransition(label = "aurora")
     val a by t.animateFloat(0f, 1f, infiniteRepeatable(tween(9000), RepeatMode.Reverse), label = "a")
     val b by t.animateFloat(0f, 1f, infiniteRepeatable(tween(11000), RepeatMode.Reverse), label = "b")
-    Box(modifier.background(Color(0xFF06163A))) {
+    // Classic look: the old app's navy with soft blue lights.
+    StatusBarTone.OnDarkHeader()
+    Box(modifier.background(Color(0xFF03274B))) {
         // Soft lights drawn as radial gradients: no blur, so it works on Android 7 and costs little on budget phones.
         Box(Modifier.offset(x = (-90 + 30 * a).dp, y = (-90 + 20 * a).dp).size(320.dp)
-            .background(Brush.radialGradient(listOf(Color(0xFF494FE6).copy(alpha = 0.95f), Color(0xFF494FE6).copy(alpha = 0.35f), Color.Transparent))))
+            .background(Brush.radialGradient(listOf(Color(0xFF1565C0).copy(alpha = 0.95f), Color(0xFF1565C0).copy(alpha = 0.35f), Color.Transparent))))
         Box(Modifier.align(Alignment.TopEnd).offset(x = (110 - 30 * b).dp, y = (-10 + 20 * b).dp).size(300.dp)
-            .background(Brush.radialGradient(listOf(Color(0xFF7B5CFF).copy(alpha = 0.9f), Color(0xFF7B5CFF).copy(alpha = 0.3f), Color.Transparent))))
+            .background(Brush.radialGradient(listOf(Color(0xFF1E88E5).copy(alpha = 0.9f), Color(0xFF1E88E5).copy(alpha = 0.3f), Color.Transparent))))
         Box(Modifier.align(Alignment.BottomCenter).offset(y = (60 - 20 * a).dp).size(260.dp)
             .background(Brush.radialGradient(listOf(Color(0xFF16A9C7).copy(alpha = 0.45f), Color.Transparent))))
         content()
@@ -155,7 +163,7 @@ private fun GlassCard(modifier: Modifier = Modifier, content: @Composable Column
 
 @Composable
 private fun AuthScaffold(title: String, onBack: (() -> Unit)?, content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxSize().systemBarsPadding().imePadding()) {
+    Column(Modifier.fillMaxSize().systemBarsPadding().keyboardAware()) {
         AslTopBar(title, onBack = onBack)
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp),
@@ -247,38 +255,52 @@ fun LoginScreen(
         return
     }
 
-    Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState())) {
-        AuroraBox(Modifier.fillMaxWidth()) {
-            Column(Modifier.statusBarsPadding().padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 64.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) { AslLogo(); Spacer(Modifier.weight(1f)); LanguagePill() }
-                Spacer(Modifier.height(18.dp))
-                Text(stringResource(R.string.login_welcome), style = AslTheme.type.headline, color = Color.White, modifier = Modifier.semantics { heading() })
-                Text(stringResource(R.string.login_sub), style = AslTheme.type.body, color = Color.White.copy(alpha = 0.85f))
+    // Classic look: the old login (navy → blue, big logo, white panel, navy pill button, "Powered by").
+    ClassicAuthBackground(Modifier.fillMaxSize()) {
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val viewport = maxHeight
+            // The white panel always reaches the bottom edge, whatever the screen height.
+            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(0.4f).background(c.surface))
+            Column(Modifier.fillMaxSize().keyboardAware().verticalScroll(rememberScrollState())) {
+                Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp)) { Spacer(Modifier.weight(1f)); LanguagePill() }
+                LogoHero(124.dp, Modifier.align(Alignment.CenterHorizontally))
+                Spacer(Modifier.height(10.dp))
+                AuthSheet(Modifier.heightIn(min = viewport * 0.62f).navigationBarsPadding()) {
+                    Column(Modifier.fillMaxWidth().riseIn(250), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(stringResource(R.string.login_welcome_user), style = AslTheme.type.headline, color = c.primary, modifier = Modifier.semantics { heading() })
+                        Text(stringResource(R.string.login_sub), style = AslTheme.type.body, color = c.textSecondary, textAlign = TextAlign.Center)
+                    }
+                    Column(Modifier.fillMaxWidth().shakeOn(s.error).riseIn(340), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        AslTextField(
+                            value = s.loginId, onValueChange = vm::onLoginIdChange, label = stringResource(R.string.login_id),
+                            keyboardType = KeyboardType.Email, imeAction = ImeAction.Next, onImeAction = vm::onLoginIdDone,
+                            error = if (s.showIdError) stringResource(R.string.login_id_error) else null,
+                        )
+                        AslTextField(
+                            value = s.password, onValueChange = vm::onPasswordChange, label = stringResource(R.string.login_password),
+                            password = true, imeAction = ImeAction.Done, onImeAction = vm::submit,
+                            error = s.error?.let { authErrorText(it) },
+                        )
+                        Text(
+                            stringResource(R.string.login_forgot), style = AslTheme.type.label, color = c.primaryEnd,
+                            modifier = Modifier.align(Alignment.End).clip(RoundedCornerShape(8.dp)).clickable(role = Role.Button) { onForgot(s.parsedId?.raw) }.padding(6.dp),
+                        )
+                    }
+                    PillButton(
+                        stringResource(R.string.login_sign_in), onClick = vm::submit, enabled = s.canSubmit || s.loading, loading = s.loading,
+                        modifier = Modifier.align(Alignment.CenterHorizontally).riseIn(430),
+                    )
+                    Row(Modifier.fillMaxWidth().riseIn(500), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                        Icon(AslIcons.Lock, null, tint = c.textSecondary, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(R.string.login_secure), style = AslTheme.type.caption, color = c.textSecondary)
+                    }
+                    // Room for the "Powered by" strip pinned at the bottom of the screen.
+                    Spacer(Modifier.height(96.dp))
+                }
             }
-        }
-        GlassCard(Modifier.offset(y = (-44).dp)) {
-            AslTextField(
-                value = s.loginId, onValueChange = vm::onLoginIdChange, label = stringResource(R.string.login_id),
-                keyboardType = KeyboardType.Email, imeAction = ImeAction.Next, onImeAction = vm::onLoginIdDone,
-                error = if (s.showIdError) stringResource(R.string.login_id_error) else null,
-            )
-            AslTextField(
-                value = s.password, onValueChange = vm::onPasswordChange, label = stringResource(R.string.login_password),
-                password = true, imeAction = ImeAction.Done, onImeAction = vm::submit,
-                error = s.error?.let { authErrorText(it) },
-            )
-            AslPrimaryButton(stringResource(R.string.login_sign_in), onClick = vm::submit, enabled = s.canSubmit || s.loading, loading = s.loading)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.login_forgot), style = AslTheme.type.label, color = c.primary,
-                    modifier = Modifier.clickable(role = Role.Button) { onForgot(s.parsedId?.raw) }.padding(vertical = 8.dp))
-                Spacer(Modifier.weight(1f))
-                Text(stringResource(R.string.login_help), style = AslTheme.type.caption, color = c.textSecondary)
-            }
-        }
-        Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-            Icon(AslIcons.Lock, null, tint = c.textSecondary, modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(stringResource(R.string.login_secure), style = AslTheme.type.caption, color = c.textSecondary)
+            // As on the old login: "Powered by" and the partners sit at the very bottom of the screen.
+            PoweredBy(Modifier.align(Alignment.BottomCenter).background(c.surface).navigationBarsPadding().padding(horizontal = 20.dp).padding(top = 8.dp, bottom = 14.dp).riseIn(600))
         }
     }
 
@@ -312,29 +334,69 @@ fun OtpScreen(onSignedIn: (needsLockSetup: Boolean) -> Unit, onBack: () -> Unit,
             }
         }
     }
-    AuthScaffold(stringResource(R.string.otp_title), onBack = leave) {
-        Spacer(Modifier.height(4.dp))
-        BigIcon(AslIcons.Shield, if (s.error != null) AslGradients.failed else AslGradients.action, modifier = Modifier.align(Alignment.CenterHorizontally))
-        Text(stringResource(R.string.otp_enter), style = AslTheme.type.title, color = c.textPrimary, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-        Text(stringResource(R.string.otp_sent), style = AslTheme.type.body, color = c.textSecondary, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-        OtpInput(s.otp, vm::onOtpChange, length = OTP_LENGTH, isError = s.error != null)
-        val msg = when {
-            s.coolDown > 0 -> stringResource(R.string.otp_cooldown, s.coolDown)
-            s.error is AuthError.Server && s.triesLeft in 1 until OTP_TRIES -> stringResource(R.string.otp_tries_left, s.triesLeft)
-            s.error != null -> authErrorText(s.error!!)
-            s.resent -> stringResource(R.string.otp_resent)
-            else -> null
+    // Classic look: the old "Verify OTP" panel on the navy → blue page, with the logo above it.
+    ClassicAuthBackground(Modifier.fillMaxSize()) {
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val viewport = maxHeight
+            // The white panel always reaches the bottom edge, whatever the screen height.
+            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(0.4f).background(c.surface))
+            Column(Modifier.fillMaxSize().keyboardAware().verticalScroll(rememberScrollState())) {
+                Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    GlassBack(leave, stringResource(R.string.common_back))
+                    Text(stringResource(R.string.otp_title), style = AslTheme.type.title, color = Color.White, modifier = Modifier.padding(start = 12.dp).semantics { heading() })
+                }
+                LogoHero(92.dp, Modifier.align(Alignment.CenterHorizontally))
+                Spacer(Modifier.height(10.dp))
+                AuthSheet(Modifier.heightIn(min = viewport * 0.66f).navigationBarsPadding()) {
+                    Column(Modifier.fillMaxWidth().riseIn(250), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(stringResource(R.string.otp_verify_title), style = AslTheme.type.headline, color = c.primary)
+                        Text(stringResource(R.string.otp_enter), style = AslTheme.type.bodyStrong, color = c.textPrimary, textAlign = TextAlign.Center)
+                        Text(stringResource(R.string.otp_sent), style = AslTheme.type.body, color = c.textSecondary, textAlign = TextAlign.Center)
+                    }
+                    Box(Modifier.fillMaxWidth().shakeOn(s.error).riseIn(340)) {
+                        OtpInput(s.otp, vm::onOtpChange, length = OTP_LENGTH, isError = s.error != null)
+                    }
+                    val msg = when {
+                        s.coolDown > 0 -> stringResource(R.string.otp_cooldown, s.coolDown)
+                        s.error is AuthError.Server && s.triesLeft in 1 until OTP_TRIES -> stringResource(R.string.otp_tries_left, s.triesLeft)
+                        s.error != null -> authErrorText(s.error!!)
+                        s.resent -> stringResource(R.string.otp_resent)
+                        else -> null
+                    }
+                    if (msg != null) Text(msg, style = AslTheme.type.label, color = if (s.error != null || s.coolDown > 0) c.error else c.success, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                    ResendRow(s.resendIn, vm::resend, Modifier.align(Alignment.CenterHorizontally).riseIn(420))
+                    PillButton(
+                        stringResource(R.string.otp_verify), onClick = vm::verify, enabled = s.otp.length == OTP_LENGTH && s.coolDown == 0, loading = s.loading,
+                        modifier = Modifier.align(Alignment.CenterHorizontally).riseIn(480),
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    AlertBanner(AlertKind.Info, stringResource(R.string.otp_never_share), message = stringResource(R.string.otp_never_share_sub), icon = AslIcons.Lock, modifier = Modifier.riseIn(560))
+                }
+            }
         }
-        if (msg != null) Text(msg, style = AslTheme.type.label, color = if (s.error != null || s.coolDown > 0) c.error else c.success, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-        if (s.resendIn > 0) {
-            Text(stringResource(R.string.otp_resend_in, "0:" + s.resendIn.toString().padStart(2, '0')), style = AslTheme.type.caption, color = c.textSecondary, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-        } else {
-            Text(stringResource(R.string.otp_resend), style = AslTheme.type.label, color = c.primary, textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = vm::resend).padding(8.dp))
+    }
+}
+
+/** A ring empties as the resend timer runs; at zero it becomes the "Resend OTP" link. */
+@Composable
+private fun ResendRow(resendIn: Int, onResend: () -> Unit, modifier: Modifier = Modifier) {
+    val c = AslTheme.colors
+    if (resendIn > 0) {
+        Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val total = remember { maxOf(resendIn, 30) }
+            Box(contentAlignment = Alignment.Center) {
+                androidx.compose.material3.CircularProgressIndicator(
+                    progress = { resendIn / total.toFloat() }, modifier = Modifier.size(28.dp), color = c.primaryEnd, trackColor = c.tint, strokeWidth = 3.dp,
+                )
+                Text("$resendIn", style = AslTheme.type.micro.copy(fontSize = AslTheme.type.micro.fontSize * 0.85f), color = c.primary)
+            }
+            Text(stringResource(R.string.otp_resend_ring, resendIn), style = AslTheme.type.caption, color = c.textSecondary)
         }
-        AslPrimaryButton(stringResource(R.string.otp_verify), onClick = vm::verify, enabled = s.otp.length == OTP_LENGTH && s.coolDown == 0, loading = s.loading)
-        Spacer(Modifier.height(12.dp))
-        AlertBanner(AlertKind.Info, stringResource(R.string.otp_never_share), message = stringResource(R.string.otp_never_share_sub), icon = AslIcons.Lock)
+    } else {
+        Text(
+            stringResource(R.string.otp_resend), style = AslTheme.type.label, color = c.primaryEnd,
+            modifier = modifier.clip(RoundedCornerShape(8.dp)).clickable(role = Role.Button, onClick = onResend).padding(8.dp),
+        )
     }
 }
 

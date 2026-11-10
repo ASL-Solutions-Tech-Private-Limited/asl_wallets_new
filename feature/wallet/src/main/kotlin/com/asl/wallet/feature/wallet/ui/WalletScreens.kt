@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -158,7 +159,7 @@ fun AddMoneyScreen(
                 is AddMoneyEvent.OpenPayU -> {
                     val activity: Activity? = context.findActivity()
                     if (activity == null) vm.onPayUReturn(e.order, com.asl.wallet.feature.wallet.payu.PayUReturn.Error)
-                    else vm.payu.open(activity, e.order, e.production, vm.hashes) { r -> vm.onPayUReturn(e.order, r) }
+                    else vm.payu.open(activity, e.order, e.production, vm.hashes) { r, payId -> vm.onPayUReturn(e.order, r, payId) }
                 }
             }
         }
@@ -191,15 +192,14 @@ fun AddMoneyScreen(
                     }
                 }
                 else -> {
-                    val quick = info.limits.quickAmounts()
-                    AmountCard(s.amount, quickAmounts = quick, selectedQuick = s.amount?.let { a -> quick.firstOrNull { java.math.BigDecimal(it).compareTo(a) == 0 } }, onQuickSelect = vm::onQuick)
-                    AslTextField(s.amountText, vm::onAmount, stringResource(R.string.w_amount), keyboardType = KeyboardType.Decimal, maxLength = 11,
-                        error = if (s.showErrors) s.problem?.let { amountProblemText(it, info.limits) } else null)
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                        Icon(AslIcons.Shield, null, tint = AslTheme.colors.textSecondary, modifier = Modifier.size(14.dp))
-                        Text(" " + stringResource(R.string.w_pay_using), style = AslTheme.type.caption, color = AslTheme.colors.textSecondary)
+                    // Classic, animated form. Over the maximum shows at once; under the minimum only after "Pay".
+                    val p = s.problem
+                    val err = when {
+                        s.showErrors && p != null -> amountProblemText(p, info.limits)
+                        p == com.asl.wallet.feature.wallet.domain.AmountProblem.AboveMax -> amountProblemText(p, info.limits)
+                        else -> null
                     }
-                    Note(stringResource(R.string.w_limits_line, Money.format(info.limits.min, showPaise = false), Money.format(info.limits.max, showPaise = false), money(info.balance)))
+                    AddMoneyForm(info, s.amountText, s.amount, err, onAmount = { vm.onAmount(it.take(11)) }, onQuick = vm::onQuick)
                     ErrorBanner(s.error)
                 }
             }
@@ -212,16 +212,20 @@ fun AddMoneyScreen(
 private fun AddMoneyResultView(s: AddMoneyState, onDone: () -> Unit, again: () -> Unit, check: () -> Unit, onCallSupport: () -> Unit) {
     val title = stringResource(R.string.w_add_money)
     when (val r = s.result) {
-        is AddMoneyResult.Success -> WalletScaffold(title, null, secure = true, bottom = {
-            AslPrimaryButton(stringResource(R.string.w_done), onDone)
-            AslButton(stringResource(R.string.w_add_more), again, Modifier.fillMaxWidth(), style = AslButtonStyle.Outline)
-        }) {
-            ResultBlock(ResultKind.Ok, stringResource(R.string.w_added, money(r.amount)), stringResource(R.string.w_added_sub), listOfNotNull(
-                s.newBalance?.let { KeyValue(stringResource(R.string.w_new_balance), money(it)) },
-                r.mode?.let { KeyValue(stringResource(R.string.w_paid_with), it) },
-                KeyValue(stringResource(R.string.w_txn_id), r.txnId),
-                r.payuRef?.let { KeyValue(stringResource(R.string.w_payu_ref), it) },
-            ))
+        is AddMoneyResult.Success -> Box(Modifier.fillMaxSize()) {
+            WalletScaffold(title, null, secure = true, bottom = {
+                AslPrimaryButton(stringResource(R.string.w_done), onDone)
+                AslButton(stringResource(R.string.w_add_more), again, Modifier.fillMaxWidth(), style = AslButtonStyle.Outline)
+            }) {
+                ResultBlock(ResultKind.Ok, stringResource(R.string.w_added, money(r.amount)), stringResource(R.string.w_added_sub), listOfNotNull(
+                    s.newBalance?.let { KeyValue(stringResource(R.string.w_new_balance), money(it)) },
+                    r.mode?.let { KeyValue(stringResource(R.string.w_paid_with), it) },
+                    KeyValue(stringResource(R.string.w_txn_id), r.txnId),
+                    r.payuRef?.let { KeyValue(stringResource(R.string.w_payu_ref), it) },
+                ))
+            }
+            // Money is in: a one-time confetti burst over the result (none when animations are off).
+            com.asl.wallet.core.designsystem.component.ConfettiBurst(Modifier.fillMaxSize())
         }
         is AddMoneyResult.Pending -> WalletScaffold(title, null, secure = true, bottom = {
             AslPrimaryButton(stringResource(R.string.w_check_again), check, loading = s.checking, icon = AslIcons.Refresh)

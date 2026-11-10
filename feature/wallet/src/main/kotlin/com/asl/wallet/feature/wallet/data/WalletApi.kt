@@ -25,6 +25,13 @@ import retrofit2.http.Query
  * Wallet endpoints (merchant/my-wallet/...). Shapes checked read-only on UAT on 4 Nov 2026 and against the backend
  * source. Every call that moves money carries the Idempotency-Key header.
  */
+/**
+ * Where the backend serves PayU Checkout Pro. On UAT it is https://www.testproject.co.in/api/v1/payments/payu/…
+ * (host root, without the "/app" prefix the other APIs use). The leading "/" makes Retrofit resolve it against the
+ * host, so the same pinned host and login token apply. Change it here if Live serves it elsewhere.
+ */
+const val PAYU_ROOT = "/api/v1/payments/payu"
+
 interface WalletApi {
     @GET("merchant/my-wallet/account-info")
     suspend fun accountInfo(): Response<ApiEnvelope<AccountInfoDto>>
@@ -36,20 +43,26 @@ interface WalletApi {
     @GET("merchant/my-wallet/add-money")
     suspend fun addMoneyInfo(): Response<ApiEnvelope<AddMoneyInfoDto>>
 
-    @POST("merchant/my-wallet/add-money")
+    /**
+     * PayU Checkout Pro (backend collection "ASL PayU Checkout Pro API", 9 Nov 2026). Creates the order and returns
+     * every field the SDK needs (data.payu), with the payment hash made on the server. The salt never leaves it.
+     */
+    @POST("$PAYU_ROOT/initiate")
     suspend fun addMoney(
         @Header(ApiHeaders.IDEMPOTENCY_KEY) idempotencyKey: String,
-        @Body body: AddMoneyRequest,
+        @Body body: PayUInitiateRequest,
     ): Response<ApiEnvelope<JsonObject>>
 
-    @GET("merchant/my-wallet/add-money/status/{txnId}")
+    /** The server's own record of the payment (it asks PayU when still pending). Decides what the app shows. */
+    @GET("$PAYU_ROOT/{txnId}/status")
     suspend fun addMoneyStatus(@Path("txnId") txnId: String): Response<ApiEnvelope<AddMoneyStatusDto>>
+
 
     /**
      * ⚠ Proposed to the backend (not live yet): PayU asks for extra hashes while its screens are open. The server
      * must sign only strings for this retailer's own [PayUHashRequest.txnid], so it can't be used to sign anything else.
      */
-    @POST("merchant/my-wallet/add-money/hash")
+    @POST("$PAYU_ROOT/hash")
     suspend fun payuHash(@Body body: PayUHashRequest): Response<ApiEnvelope<PayUHashDto>>
 
     // ---- Fund request (always to Admin)
@@ -76,34 +89,34 @@ interface WalletApi {
         @Query("sort") sort: String = "desc",
     ): Response<ApiEnvelope<List<FundRequestRowDto>>>
 
-    // ---- Send to own bank
-    @GET("merchant/my-wallet/send-money")
-    suspend fun sendMoneyInfo(): Response<ApiEnvelope<SendMoneyInfoDto>>
+    // ---- Payout (Postman "payout" collection, 10 Nov 2026): the retailer's own banks and payouts to them.
+    /** The retailer's own banks, with full account numbers (payout and delete name the account by its number). */
+    @POST("merchant/payout/payout-bank-list")
+    suspend fun payoutBanks(@Body body: JsonObject = JsonObject(emptyMap())): Response<ApiEnvelope<JsonElement>>
 
-    /** First call without [SendMoneyRequest.otp] sends the OTP; the second call with it moves the money. */
-    @POST("merchant/my-wallet/send-money")
-    suspend fun sendMoney(
-        @Header(ApiHeaders.IDEMPOTENCY_KEY) idempotencyKey: String?,
-        @Body body: SendMoneyRequest,
-    ): Response<ApiEnvelope<SendMoneyResultDto>>
+    /** Multipart: userRegID, bankName, accountNumber, ifscCode, accountHolderName, accountType (1 self, 2 relative), panImage, passbookImage. */
+    @Multipart
+    @POST("merchant/payout/add-bank")
+    suspend fun addPayoutBank(
+        @PartMap fields: Map<String, @JvmSuppressWildcards RequestBody>,
+        @Part panImage: MultipartBody.Part,
+        @Part passbookImage: MultipartBody.Part,
+    ): Response<ApiEnvelope<JsonElement>>
+
+    @POST("merchant/payout/delete-bank")
+    suspend fun deletePayoutBank(@Body body: PayoutAccountRequest): Response<ApiEnvelope<JsonElement>>
+
+    /** Sends the payout OTP to the retailer's registered mobile. No money moves. */
+    @POST("merchant/payout/payout-send-otp")
+    suspend fun payoutSendOtp(@Body body: JsonObject = JsonObject(emptyMap())): Response<ApiEnvelope<JsonElement>>
+
+    /** Moves money. One idempotency key per confirmed payout; never retried by the app. */
+    @POST("merchant/payout/payout")
+    suspend fun payout(@Header(ApiHeaders.IDEMPOTENCY_KEY) idempotencyKey: String, @Body body: PayoutRequest): Response<ApiEnvelope<JsonElement>>
 
     // ---- Bank accounts
-    @GET("merchant/my-wallet/bank-account")
-    suspend fun bankAccounts(): Response<ApiEnvelope<List<BankAccountDto>>>
-
     @GET("merchant/my-wallet/bank-account/options")
     suspend fun bankOptions(): Response<ApiEnvelope<List<BankOptionDto>>>
-
-    @Multipart
-    @POST("merchant/my-wallet/bank-account")
-    suspend fun addBankAccount(
-        @PartMap fields: Map<String, @JvmSuppressWildcards RequestBody>,
-        @Part panimg: MultipartBody.Part,
-        @Part passbookimg: MultipartBody.Part,
-    ): Response<ApiEnvelope<BankAccountDto>>
-
-    @DELETE("merchant/my-wallet/bank-account/{id}")
-    suspend fun deleteBankAccount(@Path("id") id: Long): Response<ApiEnvelope<JsonElement>>
 }
 
 /** The server sends snake_case and camelCase, and amounts as "23.00" or 23. Both are read. */
@@ -141,7 +154,26 @@ data class AddMoneyInfoDto(
 )
 
 @Serializable data class AddMoneyRequest(val amount: String)
-@Serializable data class PayUHashRequest(val txnid: String, val hashName: String, val hashString: String)
+
+/**
+ * amount is sent as a JSON number (e.g. 1500 or 1500.5), as in the backend collection. No defaults: the app's Json
+ * leaves default values out, and the backend needs both fields every time.
+ */
+@Serializable
+data class PayUInitiateRequest(
+    val amount: JsonPrimitive,
+    val paymentPurpose: String,
+    val isAndroid: Boolean,
+)
+@Serializable data class PayUHashRequest(
+    val txnid: String,
+    val hashName: String,
+    val hashString: String,
+    /** Sent by the PayU SDK for some hashes: then hash = sha512(hashString + salt + postSalt). */
+    val postSalt: String? = null,
+    /** "V2" for PayU's V2 hashes; null otherwise. */
+    val hashType: String? = null,
+)
 @Serializable data class PayUHashDto(val hash: String? = null)
 
 @Serializable
@@ -158,6 +190,8 @@ data class AddMoneyStatusDto(
     val bankRefNo: String? = null,
     val reason: String? = null,
     val message: String? = null,
+    val walletCredited: Boolean? = null,
+    val balanceAfter: JsonPrimitive? = null,
 )
 
 @Serializable data class RequestFromDto(val id: JsonPrimitive? = null, val name: String? = null, val role: String? = null)
@@ -289,3 +323,20 @@ data class BankOptionDto(
     val bank_name: String? = null,
     val bankCode: String? = null,
 )
+
+@Serializable data class PayoutAccountRequest(val accountNumber: String)
+
+/** No default values: every field is always sent (the Json config leaves defaults out). */
+@Serializable
+data class PayoutRequest(
+    val accountNumber: String,
+    val amount: JsonPrimitive,
+    val paymentMode: String,
+    val latitude: String,
+    val longitude: String,
+    val otp: String,
+    val source: String,
+) {
+    /** Never prints the account number or OTP. */
+    override fun toString() = "PayoutRequest(amount=$amount, mode=$paymentMode)"
+}

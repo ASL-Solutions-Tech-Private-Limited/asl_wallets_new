@@ -92,21 +92,33 @@ data class RecipientForm(
 ) {
     enum class Field { Bank, Account, Confirm, Ifsc, Name, Mobile }
 
-    val verified: Boolean get() = bankName != null && bankName.equals(name.trim(), ignoreCase = true)
+    /**
+     * The bank name check ran for these bank details. Changing the bank, account, IFSC or mobile clears [bankName],
+     * so a check never carries over to a different account; editing only the name keeps it.
+     */
+    val nameChecked: Boolean get() = bankName != null
+
+    /** The name in the field is exactly the bank's name. */
+    val verified: Boolean get() = bankName != null && DmtRules.cleanName(bankName).equals(DmtRules.cleanName(name), ignoreCase = true)
 
     fun problems(): Set<Field> = buildSet {
         if (bank == null) add(Field.Bank)
         if (!Validators.isAccountNumber(account)) add(Field.Account)
         if (confirm != account || confirm.isEmpty()) add(Field.Confirm)
         if (!Validators.isIfsc(ifsc)) add(Field.Ifsc)
-        if (!NAME.matches(name.trim())) add(Field.Name)
+        if (!NAME.matches(DmtRules.cleanName(name))) add(Field.Name)
         if (!Validators.isMobile(mobile)) add(Field.Mobile)
     }
 
     /** Fields the paid name check needs. */
     fun canCheckName(): Boolean = bank != null && Validators.isAccountNumber(account) && confirm == account && Validators.isIfsc(ifsc) && Validators.isMobile(mobile)
 
-    companion object { val NAME = Regex("^[A-Za-z][A-Za-z .']{1,99}$") }
+    companion object {
+        /** Banks return names like "Mr. MD INJAMAM-UL HOQUE" or "S/O RAM (HUF)": letters plus . ' - & , / ( ). */
+        val NAME = Regex("^[A-Za-z][A-Za-z .'\\-&,/()]{1,99}$")
+        /** Characters the name field accepts while typing. */
+        fun isNameChar(c: Char) = c.isLetter() || c in " .'-&,/()"
+    }
 }
 
 object DmtRules {
@@ -117,6 +129,11 @@ object DmtRules {
     private val CUSTOMER_NAME = Regex("^[A-Za-z][A-Za-z .']{1,59}$")
 
     fun isCustomerName(s: String) = CUSTOMER_NAME.matches(s.trim())
+
+    private val TITLES = setOf("MR", "MRS", "MS", "MISS", "SHRI", "SRI", "SMT", "KUMARI", "KU", "DR")
+
+    /** Trims and folds runs of spaces (banks send "HOQUE  MD"). */
+    fun cleanName(s: String) = s.trim().replace(Regex("\\s+"), " ")
 
     /** Whole rupees. The backend splits large amounts into bank-sized parts (user, 5 Nov 2026); the app never splits. */
     fun amountOf(text: String): Int? = text.trim().toIntOrNull()?.takeIf { it in MIN_AMOUNT..MAX_AMOUNT }
@@ -138,7 +155,8 @@ object DmtRules {
      * ("Rakesh Kumar" vs "NIKHIL KUMAR" → different; "Nikhil" vs "NIKHIL KUMAR" → same).
      */
     fun namesDiffer(typed: String, bank: String): Boolean {
-        fun first(s: String) = s.uppercase().split(Regex("[^A-Z]+")).firstOrNull { it.isNotEmpty() }
+        // Titles aren't names: "Mr. MD INJAMAM" starts with MD, not MR.
+        fun first(s: String) = s.uppercase().split(Regex("[^A-Z]+")).firstOrNull { it.isNotEmpty() && it !in TITLES }
         val a = first(typed); val b = first(bank)
         return a != null && b != null && a != b
     }

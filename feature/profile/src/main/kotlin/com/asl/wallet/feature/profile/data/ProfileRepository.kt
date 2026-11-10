@@ -1,5 +1,6 @@
 package com.asl.wallet.feature.profile.data
 
+import com.asl.wallet.core.network.model.serviceRows
 import com.asl.wallet.core.common.format.Masking
 import com.asl.wallet.core.network.NetworkResult
 import com.asl.wallet.core.network.map
@@ -35,8 +36,8 @@ class ProfileRepositoryImpl @Inject constructor(
 
     override suspend fun commission() = safeApiCall(json) { api.commission() }.map { it.toCommission() }
 
-    override suspend fun activeServices() = safeApiCall(json) { api.services() }.map { list ->
-        list.mapNotNull { it.toActive() }.distinctBy { it.name.lowercase() }.sortedWith(compareBy({ !it.active }, { it.name.lowercase() }))
+    override suspend fun activeServices() = safeApiCall(json) { api.services() }.map { data ->
+        serviceRows(data).mapNotNull { runCatching { json.decodeFromJsonElement(ServiceStatusDto.serializer(), it) }.getOrNull()?.toActive() }.distinctBy { it.name.lowercase() }.sortedWith(compareBy({ !it.active }, { it.name.lowercase() }))
     }
 
     override suspend fun requestPasswordChange(current: String, new: String) =

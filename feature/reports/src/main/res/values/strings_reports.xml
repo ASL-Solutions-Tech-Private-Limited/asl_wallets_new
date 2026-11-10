@@ -160,4 +160,8 @@
     <string name="rp_opening_short">Opening balance</string>
     <string name="rp_closing_short">Closing balance · totals</string>
     <string name="rp_statement_footer">Computer-generated statement from the ASL Wallet app.</string>
+    <string name="rp_kind_add_money">Add money</string>
+    <string name="rp_search_hint_add_money">Txn ID or bank ref</string>
+    <string name="rp_t_added">Added to wallet</string>
+    <string name="rp_t_not_completed">Not completed</string>
 </resources>

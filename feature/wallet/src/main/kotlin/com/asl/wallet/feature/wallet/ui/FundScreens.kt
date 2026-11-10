@@ -1,5 +1,6 @@
 package com.asl.wallet.feature.wallet.ui
 
+import com.asl.wallet.core.designsystem.component.HeaderAction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -79,7 +80,7 @@ fun FundRequestScreen(onBack: () -> Unit, onMyRequests: () -> Unit, onDone: () -
     var datePicker by remember { mutableStateOf(false) }
     val title = if (s.editing != null) stringResource(R.string.w_edit_request) else stringResource(R.string.w_fund_request)
     val myRequests: @Composable () -> Unit = {
-        if (s.editing == null) TextButton(onMyRequests) { Text(stringResource(R.string.w_my_requests), style = AslTheme.type.label, color = AslTheme.colors.primary) }
+        if (s.editing == null) HeaderAction(stringResource(R.string.w_my_requests), onMyRequests, icon = AslIcons.Document)
     }
 
     when (s.phase) {
@@ -247,16 +248,12 @@ fun MyRequestsScreen(onBack: () -> Unit, onEdit: () -> Unit, onNewRequest: () ->
     }
 }
 
-/** 4.16 details (edit/delete while pending), 4.17 declined with Admin's reason, 4.18 delete confirmation. */
+/** 4.16 details (view only), 4.17 declined with Admin's reason. */
 @Composable
 private fun RequestDetails(r: FundRequestItem, s: RequestsState, vm: MyRequestsViewModel, onEdit: () -> Unit, onNewRequest: () -> Unit) {
     WalletScaffold(stringResource(R.string.w_request_title, r.ref), vm::close, bottom = when (r.status) {
-        FundStatus.Pending -> ({
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AslButton(stringResource(R.string.w_edit), onEdit, Modifier.weight(1f), style = AslButtonStyle.Outline, icon = AslIcons.Edit)
-                AslButton(stringResource(R.string.w_delete), vm::askDelete, Modifier.weight(1f), style = AslButtonStyle.Danger, icon = AslIcons.Trash)
-            }
-        })
+        // View only: retailers can't edit or delete a sent request (decided 9 Nov 2026); Admin handles changes.
+        FundStatus.Pending -> null
         FundStatus.Declined -> ({ AslPrimaryButton(stringResource(R.string.w_new_request), onNewRequest) })
         FundStatus.Approved -> null
     }) {
@@ -272,10 +269,6 @@ private fun RequestDetails(r: FundRequestItem, s: RequestsState, vm: MyRequestsV
         if (r.status != FundStatus.Declined) Timeline(r)
         ErrorBanner(s.actionError)
     }
-    if (s.confirmDelete) ConfirmDialog(
-        stringResource(R.string.w_delete_request_q), stringResource(R.string.w_delete_request_msg, Money.format(r.amount), r.utr.takeLast(4)),
-        stringResource(R.string.w_delete), s.deleting, vm::delete, vm::cancelDelete,
-    )
 }
 
 @Composable

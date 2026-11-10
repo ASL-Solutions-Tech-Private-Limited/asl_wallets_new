@@ -15,6 +15,8 @@ android {
 }
 
 dependencies {
+    // Classic look: the old app's animated service icons (Lottie files in res/raw/classic_lottie_*).
+    implementation(libs.lottie.compose)
     api(project(":core:common"))
     api(platform(libs.androidx.compose.bom))
     api(libs.androidx.compose.ui)

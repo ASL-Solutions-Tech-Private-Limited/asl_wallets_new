@@ -299,7 +299,7 @@ fun SlideToConfirm(
                 },
             contentAlignment = Alignment.Center,
         ) {
-            Icon(if (done) AslIcons.Check else AslIcons.Send, contentDescription = null, tint = AslTheme.colors.primary.takeUnless { AslTheme.colors.isDark } ?: Color(0xFF494FE6), modifier = Modifier.size(22.dp))
+            Icon(if (done) AslIcons.Check else AslIcons.Send, contentDescription = null, tint = AslTheme.colors.primary.takeUnless { AslTheme.colors.isDark } ?: Color(0xFF1565C0), modifier = Modifier.size(22.dp))
         }
     }
 }

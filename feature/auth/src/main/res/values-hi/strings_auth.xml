@@ -72,4 +72,11 @@
     <string name="lock_setup_none_title">इस फ़ोन में स्क्रीन लॉक नहीं है</string>
     <string name="lock_setup_none_body">फ़ोन सेटिंग में फ़िंगरप्रिंट, PIN, पैटर्न या पासवर्ड सेट करें, फिर वापस आएँ।</string>
     <string name="lock_setup_open_settings">स्क्रीन लॉक सेट करें</string>
+    <!-- Classic sign-in -->
+    <string name="auth_logo_desc">ASL वॉलेट</string>
+    <string name="auth_powered_by">द्वारा संचालित</string>
+    <string name="login_welcome_user">स्वागत है!</string>
+    <string name="otp_verify_title">OTP सत्यापित करें</string>
+    <string name="otp_resend_ring">%1$d से. में दोबारा भेजें</string>
+    <string name="common_back">वापस</string>
 </resources>

@@ -16,7 +16,7 @@ interface HomeApi {
     suspend fun accountInfo(): Response<ApiEnvelope<AccountInfoDto>>
 
     @GET("merchant/services")
-    suspend fun services(): Response<ApiEnvelope<List<ServiceDto>>>
+    suspend fun services(): Response<ApiEnvelope<kotlinx.serialization.json.JsonElement>>
 
     @GET("merchant/ledger-report")
     suspend fun ledger(@Query("page") page: Int = 1, @Query("limit") limit: Int = 3): Response<ApiEnvelope<List<LedgerDto>>>

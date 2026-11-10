@@ -1,5 +1,7 @@
 package com.asl.wallet.feature.wallet.ui
 
+import com.asl.wallet.core.designsystem.component.keyboardAware
+import androidx.compose.foundation.layout.imePadding
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -67,7 +69,7 @@ internal fun WalletScaffold(
 ) {
     val c = AslTheme.colors
     if (secure) SecureScreen()
-    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding()) {
+    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding().keyboardAware()) {
         AslTopBar(title, onBack = onBack, closeIcon = close, actions = { right?.invoke() })
         Column(
             Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 16.dp)
@@ -161,7 +163,7 @@ internal fun WalletSheet(onDismiss: () -> Unit, dismissible: Boolean = true, con
         ),
         containerColor = AslTheme.colors.surface, shape = AslShapes.sheet,
     ) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp).padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
+        Column(Modifier.fillMaxWidth().imePadding().navigationBarsPadding().padding(horizontal = 16.dp).padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
     }
 }
 

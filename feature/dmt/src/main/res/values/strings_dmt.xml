@@ -59,7 +59,7 @@
     <string name="d_check_name">Check name with bank · %1$s</string>
     <string name="d_checking_name">Checking with the bank</string>
     <string name="d_name_differs">Name is different at the bank</string>
-    <string name="d_name_differs_msg">You typed: %1$s · Bank says: %2$s. Ask the customer if this is the right account.</string>
+    <string name="d_name_differs_msg" formatted="true">You typed \"%1$s\". The bank\'s name is filled in above. Ask the customer if this is the right account.</string>
     <string name="d_use_bank_name">Use bank\'s name</string>
     <string name="d_bank_says">Bank says: %1$s</string>
     <string name="d_account_active">The account exists and is active.</string>
@@ -146,4 +146,9 @@
     <string name="d_offline">No internet. Check your connection and try again.</string>
     <string name="d_timeout">The server took too long. Please try again.</string>
     <string name="d_generic">Something went wrong. Please try again.</string>
+    <!-- Receipt stamp words (bill for every outcome) -->
+    <string name="d_pending">Pending</string>
+    <string name="d_failed">Failed</string>
+    <!-- Voice after the receipt -->
+    <string name="d_voice">Money transfer of %1$s rupees successful.</string>
 </resources>

@@ -4,7 +4,6 @@ import androidx.lifecycle.SavedStateHandle
 import com.asl.wallet.core.common.session.IdempotencyKey
 import com.asl.wallet.core.network.NetworkResult
 import com.asl.wallet.core.testing.MainDispatcherRule
-import com.asl.wallet.feature.wallet.data.BankAccountDto
 import com.asl.wallet.feature.wallet.data.FundRequestRowDto
 import com.asl.wallet.feature.wallet.data.LedgerDto
 import com.asl.wallet.feature.wallet.data.LimitsDto
@@ -17,7 +16,6 @@ import com.asl.wallet.feature.wallet.data.WalletRepositoryImpl
 import com.asl.wallet.feature.wallet.data.WalletSession
 import com.asl.wallet.feature.wallet.data.adminOf
 import com.asl.wallet.feature.wallet.data.summaryOf
-import com.asl.wallet.feature.wallet.data.toAccount
 import com.asl.wallet.feature.wallet.data.toEntry
 import com.asl.wallet.feature.wallet.data.toItem
 import com.asl.wallet.feature.wallet.data.toLimits
@@ -220,14 +218,6 @@ class WalletMappingTest {
         assertThat(adminOf(emptyList())).isEqualTo("1")
     }
 
-    @Test fun `bank account - acctype 2 is a relative's account, numbers masked`() {
-        val a = BankAccountDto(id = 3, bank_name = "UCO BANK", accno = "32840110063873", holdername = "AJAY", acctype = "2", is_verified = true).toAccount()!!
-        assertThat(a.owner).isEqualTo(AccountOwner.Relative)
-        assertThat(a.accountLast4).isEqualTo("3873")
-        assertThat(a.verified).isTrue()
-        assertThat(BankAccountDto(id = 4, accountType = "1").toAccount()!!.owner).isEqualTo(AccountOwner.Self)
-        assertThat(BankAccountDto(id = 5).toAccount()!!.verified).isFalse()
-    }
 
     @Test fun `ledger text hides long account numbers`() {
         val e = LedgerDto(id = 1, transdesc = "CHARGES FOR VERIFY (A/C : 0185104000179539)", debitAmt = JsonPrimitive("3.00")).toEntry()!!
@@ -242,13 +232,14 @@ class WalletRepositoryTest {
     private val server = MockWebServer()
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
     private lateinit var repo: WalletRepositoryImpl
-    private val account = SendAccount("15", "UCO BANK", "3873", "AJAY KUMAR", "UCBA0003284")
+    private val account = SendAccount("15", "UCO BANK", "3873", "AJAY KUMAR", "UCBA0003284", accountNumber = "32840110063873")
+    private val shop = com.asl.wallet.feature.wallet.data.ShopLocation(22.5726, 88.3639)
 
     @Before fun setUp() {
         server.start()
         val client = OkHttpClient.Builder().readTimeout(1, TimeUnit.SECONDS).retryOnConnectionFailure(false).build()
         val retrofit = Retrofit.Builder().baseUrl(server.url("/")).client(client).addConverterFactory(json.asConverterFactory("application/json".toMediaType())).build()
-        repo = WalletRepositoryImpl(retrofit.create(WalletApi::class.java), json)
+        repo = WalletRepositoryImpl(retrofit.create(WalletApi::class.java), json, javax.inject.Provider<com.asl.wallet.core.common.session.CurrentUser> { TestUser })
     }
     @After fun tearDown() = server.shutdown()
     private fun respond(code: Int, body: String) = server.enqueue(MockResponse().setResponseCode(code).setBody(body))
@@ -269,62 +260,131 @@ class WalletRepositoryTest {
         assertThat(i.balance).isEqualTo(BigDecimal("1022.00"))
     }
 
+    @Test fun `PayU hash ask carries postSalt and hashType, and a refusal gives no hash`() = runTest {
+        respond(200, """{"status":true,"data":{"hash":"abc"}}""")
+        val ask = com.asl.wallet.feature.wallet.payu.HashAsk("T1", "payment_source", "K|T1|1500.00|", postSalt = "PS", hashType = "V2")
+        assertThat(repo.payuHash(ask)).isEqualTo("abc")
+        val body = server.takeRequest().body.readUtf8()
+        assertThat(body).contains(""""postSalt":"PS"""")
+        assertThat(body).contains(""""hashType":"V2"""")
+        respond(403, """{"status":false,"message":"Hash request not allowed"}""")
+        assertThat(repo.payuHash(ask.copy(postSalt = null, hashType = null))).isNull()
+    }
+
+    @Test fun `PayU initiate - data payu fields open the SDK, status uses the payments payu route`() = runTest {
+        respond(201, """{"status":true,"data":{"txnid":"ASLW1","clientTxnId":"ASLW1","amount":"1500.00","payu":{"key":"K","txnid":"ASLW1","amount":"1500.00",
+            "productinfo":"ASL Wallet Topup","firstname":"A","email":"a@b.in","surl":"https://h/s","furl":"https://h/f","udf1":"","hash":"H"}}}""")
+        val ready = (repo.createOrder(BigDecimal("1500.00"), IdempotencyKey.new()) as NetworkResult.Success).data as OrderResult.Ready
+        assertThat(ready.order.txnId).isEqualTo("ASLW1")
+        assertThat(ready.order.statusId).isEqualTo("ASLW1") // this sample has clientTxnId = txnid
+        assertThat(ready.order.params["udf1"]).isEqualTo("")
+        assertThat(server.takeRequest().body.readUtf8()).isEqualTo("""{"amount":1500,"paymentPurpose":"ASL Wallet Topup","isAndroid":true}""")
+
+        // Live shape (9 Nov 2026): fields straight under data, with a separate clientTxnId for the status API.
+        respond(200, """{"status":true,"data":{"clientTxnId":"PAYU6044_1","txnid":"ASL6044T1","amount":"1.00","key":"K","productinfo":"P",
+            "firstname":"A","email":"a@b.in","surl":"https://h/s","furl":"https://h/f","hash":"H"}}""")
+        val live = (repo.createOrder(BigDecimal("1"), IdempotencyKey.new()) as NetworkResult.Success).data as OrderResult.Ready
+        assertThat(live.order.txnId).isEqualTo("ASL6044T1")
+        assertThat(live.order.statusId).isEqualTo("PAYU6044_1")
+        server.takeRequest()
+
+        respond(200, """{"status":true,"data":{"txnid":"ASLW1","amount":"1500.00","status":"SUCCESS","isPaymentComplete":true,"walletCredited":false}}""")
+        assertThat((repo.addMoneyStatus("ASLW1", null) as NetworkResult.Success).data).isInstanceOf(AddMoneyResult.Pending::class.java)
+        assertThat(server.takeRequest().path).isEqualTo("/api/v1/payments/payu/ASLW1/status")
+    }
+
     @Test fun `creating an order sends only the amount, with the Idempotency-Key header`() = runTest {
         respond(200, """{"status":true,"data":{"clientTxnId":"UPI1","paymentUrl":"https://pay","status":"INITIATED"}}""")
         val key = IdempotencyKey.new()
         assertThat((repo.createOrder(BigDecimal(1000), key) as NetworkResult.Success).data).isEqualTo(OrderResult.NotSupportedYet)
         val req = server.takeRequest()
         assertThat(req.getHeader("Idempotency-Key")).isEqualTo(key.value)
-        assertThat(req.body.readUtf8()).isEqualTo("""{"amount":"1000"}""")
+        assertThat(req.path).isEqualTo("/api/v1/payments/payu/initiate")
+        assertThat(req.body.readUtf8()).isEqualTo("""{"amount":1000,"paymentPurpose":"ASL Wallet Topup","isAndroid":true}""")
     }
 
-    @Test fun `send money - OTP step has no key, the transfer step has one`() = runTest {
-        respond(200, """{"status":true,"data":{"step":"OTP_SENT"}}""")
-        respond(200, """{"status":true,"data":{"step":"COMPLETED","servid":"PAY63","refno":"6308","payamt":"2000.00","status":"SUCCESS","bankName":"UCO BANK","accountNumber":"32840110063873"}}""")
-        assertThat(repo.sendOtp(account, BigDecimal(2000), "IMPS")).isInstanceOf(NetworkResult.Success::class.java)
+    @Test fun `payout - OTP from payout-send-otp, then payout with the full account, location and one key`() = runTest {
+        respond(200, """{"status":true,"message":"Verification OTP sent successfully","data":{"fname":"Ajay","mob":"9798143077"}}""")
+        respond(200, """{"status":true,"data":{"tranStatus":"SUCCESS","servid":"PAY63","utr":"6308","amount":"2000.00"}}""")
+        assertThat((repo.sendOtp(account, BigDecimal(2000), "IMPS") as NetworkResult.Success).data).isEqualTo("97XXX XX077")
         val key = IdempotencyKey.new()
-        val out = repo.sendMoney(account, BigDecimal(2000), "IMPS", "1234", key) as SendOutcome.Sent
+        val out = repo.sendMoney(account, BigDecimal(2000), "IMPS", "1234", key, shop) as SendOutcome.Sent
         assertThat(out.receipt.accountLast4).isEqualTo("3873")
         assertThat(out.receipt.txnId).isEqualTo("PAY63")
+        assertThat(out.receipt.bankRef).isEqualTo("6308")
         val otp = server.takeRequest()
+        assertThat(otp.path).isEqualTo("/merchant/payout/payout-send-otp")
         assertThat(otp.getHeader("Idempotency-Key")).isNull()
-        assertThat(otp.body.readUtf8()).isEqualTo("""{"payto":"15","payamt":"2000","paytype":"IMPS"}""")
         val send = server.takeRequest()
+        assertThat(send.path).isEqualTo("/merchant/payout/payout")
         assertThat(send.getHeader("Idempotency-Key")).isEqualTo(key.value)
-        assertThat(send.body.readUtf8()).contains("\"otp\":\"1234\"")
+        assertThat(send.body.readUtf8()).isEqualTo(
+            """{"accountNumber":"32840110063873","amount":2000,"paymentMode":"IMPS","latitude":"22.572600","longitude":"88.363900","otp":"1234","source":"APPS"}""",
+        )
     }
 
-    @Test fun `send money - server PENDING, a 5xx or a timeout is Pending, a 4xx is Failed`() = runTest {
-        respond(200, """{"status":true,"data":{"step":"COMPLETED","status":"PENDING"}}""")
-        assertThat(repo.sendMoney(account, BigDecimal(10), "IMPS", "1234", IdempotencyKey.new())).isInstanceOf(SendOutcome.Pending::class.java)
+    @Test fun `payout - unclear, 5xx or timeout is Pending, a 4xx or inner refusal is Failed`() = runTest {
+        respond(200, """{"status":true,"data":{"tranStatus":"PENDING"}}""")
+        assertThat(repo.sendMoney(account, BigDecimal(10), "IMPS", "1234", IdempotencyKey.new(), shop)).isInstanceOf(SendOutcome.Pending::class.java)
+        respond(200, """{"status":true,"data":{"servid":"PAY1"}}""")
+        assertThat(repo.sendMoney(account, BigDecimal(10), "IMPS", "1234", IdempotencyKey.new(), shop)).isInstanceOf(SendOutcome.Pending::class.java)
         respond(502, """{"status":false,"message":"Bad gateway"}""")
-        assertThat(repo.sendMoney(account, BigDecimal(10), "IMPS", "1234", IdempotencyKey.new())).isEqualTo(SendOutcome.Pending(null))
+        assertThat(repo.sendMoney(account, BigDecimal(10), "IMPS", "1234", IdempotencyKey.new(), shop)).isEqualTo(SendOutcome.Pending(null))
         server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE))
-        assertThat(repo.sendMoney(account, BigDecimal(10), "IMPS", "1234", IdempotencyKey.new())).isEqualTo(SendOutcome.Pending(null))
+        assertThat(repo.sendMoney(account, BigDecimal(10), "IMPS", "1234", IdempotencyKey.new(), shop)).isEqualTo(SendOutcome.Pending(null))
         respond(400, """{"status":false,"message":"Low wallet balance for payout transfer"}""")
-        assertThat(repo.sendMoney(account, BigDecimal(10), "IMPS", "1234", IdempotencyKey.new())).isEqualTo(SendOutcome.Failed("Low wallet balance for payout transfer"))
+        assertThat(repo.sendMoney(account, BigDecimal(10), "IMPS", "1234", IdempotencyKey.new(), shop)).isEqualTo(SendOutcome.Failed("Low wallet balance for payout transfer"))
+        respond(200, """{"status":true,"data":{"status":false,"message":"Invalid OTP"}}""")
+        assertThat(repo.sendMoney(account, BigDecimal(10), "IMPS", "1234", IdempotencyKey.new(), shop)).isEqualTo(SendOutcome.Failed("Invalid OTP"))
     }
 
-    @Test fun `send setup lists verified accounts only`() = runTest {
-        respond(200, """{"status":true,"data":{"accounts":[{"id":"15","bankName":"UCO BANK","accno":"32840110063873","isverify":"1"},{"id":"16","bankName":"AXIS","accno":"9","isverify":"0"}],
-            "wallet":{"balanceAmt":"2022.00"},"limits":{"minAmount":10,"maxAmount":50000},"payoutModes":["IMPS"],"notes":[" note "],"user":{"phone":"9798143077"}}}""")
+    @Test fun `payout banks - the UAT shape, every active bank listed with its verified flag, full number kept`() = runTest {
+        val list = """{"status":true,"data":[
+            {"id":"4040","accno":"32840110063873","ifsccode":"UCBA0003284","holdername":"AJAY KUMAR","acctype":"1","isverify":"ONE","status":"ONE","bankName":"UCO BANK"},
+            {"id":"4041","accno":"9123456780","ifsccode":"HDFC0000001","holdername":"AJAY KUMAR","acctype":"2","isverify":"ZERO","status":"ONE","bankName":"HDFC BANK"},
+            {"id":"4042","accno":"1111222233","isverify":"ONE","status":"ZERO","bankName":"OLD BANK"}]}"""
+        respond(200, list)
+        respond(200, """{"status":true,"data":{"available_balance_amt":"2022.00"}}""")
         val s = (repo.sendSetup() as NetworkResult.Success).data
-        assertThat(s.accounts.map { it.id }).containsExactly("15")
-        assertThat(s.notes).containsExactly("note")
-        assertThat(s.otpTo).isEqualTo("97XXX XX077")
+        // Both active banks are listed (the inactive one isn't); only the verified one can be chosen.
+        assertThat(s.accounts.map { it.id }).containsExactly("4040", "4041").inOrder()
+        assertThat(s.accounts.map { it.verified }).containsExactly(true, false).inOrder()
+        assertThat(s.accounts.first().accountNumber).isEqualTo("32840110063873")
+        assertThat(s.accounts.first().toString()).doesNotContain("32840110063873")
+        assertThat(s.balance).isEqualTo(BigDecimal("2022.00"))
+        assertThat(server.takeRequest().path).isEqualTo("/merchant/payout/payout-bank-list")
+
+        respond(200, list)
+        val banks = (repo.bankAccounts() as NetworkResult.Success).data
+        assertThat(banks.map { it.id }).containsExactly(4040L, 4041L).inOrder()
+        assertThat(banks[1].verified).isFalse()
+        assertThat(banks[1].owner).isEqualTo(AccountOwner.Relative)
     }
 
-    @Test fun `add bank account uploads both photos as files with the server's field names`() = runTest {
-        respond(201, """{"status":true,"data":{"id":9,"bank_name":"UCO BANK","accno":"32840110063873","holdername":"AJAY KUMAR","acctype":"1","is_verified":false}}""")
+    @Test fun `delete bank names the account by its full number`() = runTest {
+        respond(200, """{"status":true,"message":"Deleted"}""")
+        val a = BankAccount(4040, "UCO BANK", "3873", "AJAY KUMAR", "UCBA0003284", AccountOwner.Self, true, accountNumber = "32840110063873")
+        assertThat(repo.deleteBank(a)).isInstanceOf(NetworkResult.Success::class.java)
+        val req = server.takeRequest()
+        assertThat(req.path).isEqualTo("/merchant/payout/delete-bank")
+        assertThat(req.body.readUtf8()).isEqualTo("""{"accountNumber":"32840110063873"}""")
+        assertThat(repo.deleteBank(a.copy(accountNumber = ""))).isInstanceOf(NetworkResult.Failure::class.java)
+    }
+
+    @Test fun `add bank goes to payout add-bank with the collection's field names and the retailer's own reg no`() = runTest {
+        respond(200, """{"status":true,"message":"Bank added successfully"}""")
         val form = AddBankForm(BankOption("12", "UCO BANK"), "32840110063873", "32840110063873", "ucba0003284", "ajay kumar", AccountOwner.Self, 3, 3)
         val a = (repo.addBank(form, byteArrayOf(1, 2, 3), byteArrayOf(4, 5, 6)) as NetworkResult.Success).data
         assertThat(a.verified).isFalse()
-        val body = server.takeRequest().body.readUtf8()
-        assertThat(body).contains("name=\"panimg\"; filename=\"panimg.jpg\"")
-        assertThat(body).contains("name=\"passbookimg\"; filename=\"passbookimg.jpg\"")
+        val req = server.takeRequest()
+        assertThat(req.path).isEqualTo("/merchant/payout/add-bank")
+        val body = req.body.readUtf8()
+        assertThat(body).contains("name=\"panImage\"; filename=\"panImage.jpg\"")
+        assertThat(body).contains("name=\"passbookImage\"; filename=\"passbookImage.jpg\"")
+        for (f in listOf("userRegID", "bankName", "accountNumber", "ifscCode", "accountHolderName", "accountType")) assertThat(body).contains("name=\"$f\"")
+        assertThat(body).contains("6044")
         assertThat(body).contains("UCBA0003284")
         assertThat(body).contains("AJAY KUMAR")
-        assertThat(body).contains("name=\"acctype\"")
     }
 
     @Test fun `fund requests read rows and meta summary, filter maps to the server's words`() = runTest {
@@ -380,24 +440,41 @@ private open class FakeRepo : WalletRepository {
     override suspend fun createOrder(amount: BigDecimal, key: IdempotencyKey) = order.also { orderKeys += key }
     override suspend fun addMoneyStatus(txnId: String, amount: BigDecimal?): NetworkResult<AddMoneyResult> =
         NetworkResult.Success(statuses.removeFirstOrNull() ?: AddMoneyResult.Pending(txnId, amount), null)
-    override suspend fun payuHash(txnId: String, hashName: String, hashString: String): String? = null
+    override suspend fun payuHash(ask: com.asl.wallet.feature.wallet.payu.HashAsk): String? = null
     override suspend fun fundSetup() = fund
     override suspend fun submitFund(form: FundRequestForm, adminId: String, editId: Long?): NetworkResult<String?> = NetworkResult.Success("FR-1", null)
     override suspend fun deleteFund(id: Long): NetworkResult<Unit> = NetworkResult.Success(Unit, null)
     override suspend fun fundRequests(page: Int, status: FundStatus?): NetworkResult<FundRequestPage> = NetworkResult.Success(FundRequestPage(emptyList(), null, false), null)
     override suspend fun sendSetup() = send
-    override suspend fun sendOtp(account: SendAccount, amount: BigDecimal, mode: String): NetworkResult<Unit> = NetworkResult.Success(Unit, null)
-    override suspend fun sendMoney(account: SendAccount, amount: BigDecimal, mode: String, otp: String, key: IdempotencyKey): SendOutcome {
+    override suspend fun sendOtp(account: SendAccount, amount: BigDecimal, mode: String): NetworkResult<String?> = NetworkResult.Success("97XXX XX077", null)
+    override suspend fun sendMoney(account: SendAccount, amount: BigDecimal, mode: String, otp: String, key: IdempotencyKey, at: com.asl.wallet.feature.wallet.data.ShopLocation): SendOutcome {
         sendKeys += key; return sendOut.removeFirst()
     }
     override suspend fun bankAccounts(): NetworkResult<List<BankAccount>> = NetworkResult.Success(emptyList(), null)
     override suspend fun bankOptions(): NetworkResult<List<BankOption>> = NetworkResult.Success(emptyList(), null)
     override suspend fun addBank(form: AddBankForm, pan: ByteArray, passbook: ByteArray): NetworkResult<BankAccount> = NetworkResult.Failure.NoInternet
-    override suspend fun deleteBank(id: Long): NetworkResult<Unit> = NetworkResult.Success(Unit, null)
+    override suspend fun deleteBank(account: BankAccount): NetworkResult<Unit> = NetworkResult.Success(Unit, null)
+}
+
+private object TestUser : com.asl.wallet.core.common.session.CurrentUser {
+    override val user = kotlinx.coroutines.flow.MutableStateFlow<com.asl.wallet.core.common.session.UserSummary?>(
+        com.asl.wallet.core.common.session.UserSummary("Ajay Kumar", "ASL Payzones", 6044, "Retailer", true),
+    )
+    override suspend fun logout() = Unit
+}
+
+private class FakeLocation(
+    var permission: Boolean = true,
+    var on: Boolean = true,
+    var fix: com.asl.wallet.feature.wallet.data.ShopLocation? = com.asl.wallet.feature.wallet.data.ShopLocation(22.57, 88.36),
+) : com.asl.wallet.feature.wallet.data.PayoutLocation {
+    override fun hasPermission() = permission
+    override fun isEnabled() = on
+    override suspend fun current() = fix
 }
 
 private object NoPayU : PayUCheckout {
-    override fun open(activity: android.app.Activity, order: PayUOrder, production: Boolean, hashes: com.asl.wallet.feature.wallet.payu.HashSource, onReturn: (PayUReturn) -> Unit) = Unit
+    override fun open(activity: android.app.Activity, order: PayUOrder, production: Boolean, hashes: com.asl.wallet.feature.wallet.payu.HashSource, onReturn: (PayUReturn, String?) -> Unit) = Unit
 }
 
 class WalletViewModelTest {
@@ -442,7 +519,7 @@ class WalletViewModelTest {
         val repo = FakeRepo().apply { statuses += AddMoneyResult.Success("T1", BigDecimal(1000), "UPI", "4039") }
         val vm = AddMoneyViewModel(repo, WalletConfig(true, false), SavedStateHandle(), NoPayU)
         val order = PayUOrder("T1", BigDecimal(1000), emptyMap())
-        vm.onPayUReturn(order, PayUReturn.Finished)
+        vm.onPayUReturn(order, PayUReturn.Paid, "4039")
         advanceUntilIdle()
         assertThat(vm.state.value.result).isInstanceOf(AddMoneyResult.Success::class.java)
         assertThat(vm.state.value.newBalance).isEqualTo(BigDecimal(1022))
@@ -452,7 +529,9 @@ class WalletViewModelTest {
         advanceUntilIdle()
         assertThat(vm2.state.value.result).isInstanceOf(AddMoneyResult.Failed::class.java)
 
-        val vm3 = AddMoneyViewModel(FakeRepo(), WalletConfig(true, false), SavedStateHandle(), NoPayU)
+        // Cancelled or failed after the payment started: the server still says pending, never success.
+        val repo3 = FakeRepo()
+        val vm3 = AddMoneyViewModel(repo3, WalletConfig(true, false), SavedStateHandle(), NoPayU)
         vm3.onPayUReturn(order, PayUReturn.Finished)
         advanceUntilIdle()
         assertThat(vm3.state.value.result).isInstanceOf(AddMoneyResult.Pending::class.java) // never "success" without the server
@@ -481,7 +560,7 @@ class WalletViewModelTest {
             sendOut += SendOutcome.Failed("Invalid OTP provided for payout verification")
             sendOut += SendOutcome.Pending(null)
         }
-        val vm = SendMoneyViewModel(repo)
+        val vm = SendMoneyViewModel(repo, FakeLocation())
         vm.onAmount("2000"); vm.proceed()
         assertThat(vm.state.value.otpOpen).isTrue()
         vm.onOtp("1111"); vm.confirm()
@@ -497,13 +576,57 @@ class WalletViewModelTest {
         assertThat(repo.sendKeys).hasSize(2)
 
         val none = FakeRepo().apply { send = NetworkResult.Success((send as NetworkResult.Success).data.copy(accounts = emptyList()), null) }
-        assertThat(SendMoneyViewModel(none).state.value.phase).isEqualTo(SendPhase.NoAccount)
+        assertThat(SendMoneyViewModel(none, FakeLocation()).state.value.phase).isEqualTo(SendPhase.NoAccount)
+    }
+
+    @Test fun `payout - a bank waiting for verification is listed but can't be chosen or sent to`() = runTest {
+        val repo = FakeRepo().apply {
+            send = NetworkResult.Success((send as NetworkResult.Success).data.copy(accounts = listOf(
+                SendAccount("1", "SBI", "9580", "A", "SBIN0008437", "123456789580", verified = true),
+                SendAccount("2", "ABH", "7890", "A", "HDFC0CNAG08", "1234567890", verified = false),
+            )), null)
+        }
+        val vm = SendMoneyViewModel(repo, FakeLocation())
+        assertThat(vm.state.value.account?.id).isEqualTo("1") // the only verified one is picked
+        vm.onAccount((vm.state.value.setup!!.accounts[1]))
+        assertThat(vm.state.value.account?.id).isEqualTo("1")
+    }
+
+    @Test fun `payout - no location permission or GPS stops before the OTP, no fix sends nothing`() = runTest {
+        val repo = FakeRepo().apply { sendOut += SendOutcome.Pending(null) }
+        val loc = FakeLocation(permission = false)
+        val vm = SendMoneyViewModel(repo, loc)
+        vm.onAmount("2000"); vm.proceed()
+        assertThat(vm.state.value.location).isEqualTo(com.asl.wallet.feature.wallet.ui.LocationNeed.Permission)
+        assertThat(vm.state.value.otpOpen).isFalse()
+        loc.permission = true; loc.on = false
+        vm.onLocationChanged(true)
+        assertThat(vm.state.value.location).isEqualTo(com.asl.wallet.feature.wallet.ui.LocationNeed.TurnOn)
+        loc.on = true; loc.fix = null
+        vm.proceed()
+        assertThat(vm.state.value.otpOpen).isTrue()
+        vm.onOtp("1234"); vm.confirm(); advanceUntilIdle()
+        assertThat(vm.state.value.location).isEqualTo(com.asl.wallet.feature.wallet.ui.LocationNeed.NoFix)
+        assertThat(repo.sendKeys).isEmpty() // nothing was sent
+        loc.fix = com.asl.wallet.feature.wallet.data.ShopLocation(22.57, 88.36)
+        vm.dismissLocation(); vm.confirm(); advanceUntilIdle()
+        assertThat(repo.sendKeys).hasSize(1)
     }
 
     @Test fun `send - over the wallet balance never asks for an OTP`() = runTest {
-        val vm = SendMoneyViewModel(FakeRepo())
+        val vm = SendMoneyViewModel(FakeRepo(), FakeLocation())
         vm.onAmount("3000"); vm.proceed()
         assertThat(vm.state.value.otpOpen).isFalse()
         assertThat(vm.state.value.problem).isEqualTo(AmountProblem.OverBalance)
+    }
+}
+
+class PayUUserCredentialsTest {
+    private val launcher = com.asl.wallet.feature.wallet.payu.PayUCheckoutProLauncher(java.util.Optional.empty())
+    @org.junit.Test fun `server value wins, else key and regno, else key and mobile, else none`() {
+        com.google.common.truth.Truth.assertThat(launcher.userCredentials(mapOf("key" to "K", "user_credentials" to "K:77", "udf1" to "6044"))).isEqualTo("K:77")
+        com.google.common.truth.Truth.assertThat(launcher.userCredentials(mapOf("key" to "K", "udf1" to "6044", "phone" to "9798143077"))).isEqualTo("K:6044")
+        com.google.common.truth.Truth.assertThat(launcher.userCredentials(mapOf("key" to "K", "udf1" to "", "phone" to "97981 43077"))).isEqualTo("K:9798143077")
+        com.google.common.truth.Truth.assertThat(launcher.userCredentials(mapOf("key" to "K"))).isNull()
     }
 }

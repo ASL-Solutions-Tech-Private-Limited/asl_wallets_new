@@ -182,4 +182,30 @@
     <string name="ae_receipt_share_title">AEPS receipt</string>
     <string name="ae_setup_row">AEPS set-up</string>
     <string name="ae_due_count">%1$d due</string>
+    <!-- Receipt stamp words (bill for every outcome) -->
+    <string name="ae_s_pending">Pending</string>
+    <string name="ae_s_failed">Failed</string>
+    <string name="ae_reason">Reason</string>
+    <!-- Transaction form (10 Nov 2026) -->
+    <string name="ae_step_fill">Details</string>
+    <string name="ae_step_scan">Finger scan</string>
+    <string name="ae_step_receipt">Receipt</string>
+    <string name="ae_ask_withdraw">How much cash does the customer want?</string>
+    <string name="ae_ask_deposit">How much cash is the customer depositing?</string>
+    <string name="ae_pick_bank">Choose the customer\'s bank</string>
+    <string name="ae_pick_bank_sub">The bank linked to their Aadhaar</string>
+    <string name="ae_bank_of_customer">Customer\'s bank (linked to Aadhaar)</string>
+    <string name="ae_choose_btn">Choose</string>
+    <!-- Aadhaar consent (10 Nov 2026) -->
+    <string name="ae_consent">I have read the Aadhaar consent and the customer agrees</string>
+    <string name="ae_consent_read">Read</string>
+    <string name="ae_consent_title">Aadhaar consent</string>
+    <string name="ae_consent_text">I, the customer, give my consent to the bank and ASL to use my Aadhaar number and fingerprint (or face) only to verify me with UIDAI and to complete this AePS transaction. I understand that my biometric data is not stored, that my Aadhaar number is shown only masked on receipts, and that I can refuse to share it.</string>
+    <string name="ae_consent_ok">Customer agrees</string>
+    <!-- Voice after the receipt -->
+    <string name="ae_voice_withdraw">Cash withdrawal successful. %1$s rupees withdrawn.</string>
+    <string name="ae_voice_deposit">Cash deposit successful. %1$s rupees deposited.</string>
+    <string name="ae_voice_balance_done">Balance enquiry successful.</string>
+    <string name="ae_voice_statement">Mini statement ready.</string>
+    <string name="ae_voice_available">Available balance %1$s rupees.</string>
 </resources>

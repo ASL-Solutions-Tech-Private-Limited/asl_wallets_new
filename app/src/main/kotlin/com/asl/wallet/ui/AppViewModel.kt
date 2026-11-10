@@ -39,6 +39,8 @@ class AppViewModel @Inject constructor(
     val support: SupportContacts,
     /** Signed-in retailer (name, shop, reg no) for receipt headers. */
     val currentUser: CurrentUser,
+    /** UAT-only demos (empty in release and Live builds). */
+    val demoToggles: Set<@JvmSuppressWildcards com.asl.wallet.core.common.demo.DemoToggle>,
 ) : ViewModel() {
 
     val themeMode: StateFlow<ThemeMode> = prefs.themeMode.stateIn(viewModelScope, SharingStarted.Eagerly, ThemeMode.Light)
@@ -53,6 +55,11 @@ class AppViewModel @Inject constructor(
     }
 
     fun setTheme(mode: ThemeMode) = viewModelScope.launch { prefs.setThemeMode(mode) }
+
+    val receiptSound: StateFlow<com.asl.wallet.core.designsystem.component.ReceiptSound> =
+        prefs.receiptSound.stateIn(viewModelScope, SharingStarted.Eagerly, com.asl.wallet.core.designsystem.component.ReceiptSound())
+
+    fun setReceiptSound(s: com.asl.wallet.core.designsystem.component.ReceiptSound) = viewModelScope.launch { prefs.setReceiptSound(s) }
 
     /** UAT only: lets testers continue on an emulator/rooted test phone. Live builds never offer this. */
     fun bypassIntegrity() {

@@ -47,6 +47,11 @@ object AslIcons {
     val More get() = icon("more", rect(4f, 4f, 6.5f, 6.5f, 1.8f), rect(13.5f, 4f, 6.5f, 6.5f, 1.8f), rect(4f, 13.5f, 6.5f, 6.5f, 1.8f), rect(13.5f, 13.5f, 6.5f, 6.5f, 1.8f))
     val Home get() = icon("home", "M4 11l8-7 8 7v9H4z", "M10 20v-5h4v5")
     val Report get() = icon("report", "M5 20V10M12 20V4M19 20v-7")
+    /** Arrange Home: stacked bars with up/down arrows. */
+    val Arrange get() = icon("arrange", "M4 6h10", "M4 12h10", "M4 18h10", "M18 4v16", "M15.5 6.5L18 4l2.5 2.5", "M15.5 17.5L18 20l2.5-2.5")
+    val ArrowUp get() = icon("arrow_up", "M12 19V5", "M6 11l6-6 6 6")
+    val ArrowDown get() = icon("arrow_down", "M12 5v14", "M6 13l6 6 6-6")
+    val DragHandle get() = icon("drag", "M5 9h14", "M5 15h14")
     val Earnings get() = icon("earn", circle(12f, 12f, 8f), "M9.5 9h5M9.5 12h5M12 9c2 0 2 3 0 3l3 4")
     val User get() = icon("user", circle(12f, 8.5f, 3.5f), "M5 20a7 7 0 0 1 14 0")
     val Bell get() = icon("bell", "M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z", "M10 20.5a2 2 0 0 0 4 0")

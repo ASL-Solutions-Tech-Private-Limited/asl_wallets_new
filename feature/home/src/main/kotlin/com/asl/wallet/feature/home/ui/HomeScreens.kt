@@ -1,5 +1,7 @@
 package com.asl.wallet.feature.home.ui
 
+import com.asl.wallet.core.designsystem.component.keyboardAware
+import androidx.compose.foundation.layout.imePadding
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.net.Uri
@@ -126,14 +128,14 @@ internal fun visualOf(kind: ServiceKind): Pair<ImageVector, List<Color>> = when 
 }
 
 @Composable
-private fun HomeService.toItem(): ServiceItem {
+internal fun HomeService.toItem(): ServiceItem {
     val (icon, colors) = visualOf(kind)
     val tag = when (destination) {
         ServiceDestination.ComingSoon -> stringResource(R.string.tag_soon)
         is ServiceDestination.Partner -> stringResource(R.string.tag_web)
         is ServiceDestination.App -> null
     }
-    return ServiceItem(name, icon, colors, tag = tag)
+    return ServiceItem(name, icon, colors, tag = tag, art = artOf(this))
 }
 
 @Composable
@@ -147,11 +149,12 @@ private fun groupTitle(g: ServiceGroup) = stringResource(
 
 // ---------------------------------------------------------------- shell with bottom tabs
 
-enum class HomeTab { Home, Reports, Earnings, Profile }
+/** Classic look: the old app's bottom bar, with Reports in place of Packages (decided 7 Nov 2026). */
+enum class HomeTab { Home, Wallet, Reports, Profile }
 
 /**
- * Signed-in shell: Home · Reports · Earnings · Profile. Only Home is real in Module 2; the other tabs say
- * which update brings them, and Profile carries Log out until Module 3.
+ * Signed-in shell: Home · Wallet · Reports · Profile. Wallet opens the Wallet screens (it isn't a tab page),
+ * so the bar stays on the tab you were on.
  */
 @Composable
 fun HomeShell(
@@ -163,35 +166,48 @@ fun HomeShell(
     extraProfileAction: (@Composable () -> Unit)? = null,
     /** The real Profile tab (Module 3), supplied by the app. */
     profileTab: (@Composable () -> Unit)? = null,
-    /** Module 4: the balance card opens Wallet; "Add money" opens Add money. Null keeps the "coming soon" note. */
+    /** Module 4: the balance opens Wallet; "Add Money" opens Add money. */
     onWallet: (() -> Unit)? = null,
     onAddMoney: (() -> Unit)? = null,
     /** Module 6: the real Reports tab, and where Home's "See all" goes (the wallet ledger). */
     reportsTab: (@Composable () -> Unit)? = null,
     onSeeAll: (() -> Unit)? = null,
+    /** Classic Home's report shortcuts. */
+    onReport: ((HomeReport) -> Unit)? = null,
+    /** Opens Arrange Home (section order). */
+    onArrange: () -> Unit = {},
+    /** BBPS: straight into a category ("Electricity" …), or all categories for null. */
+    onBbps: ((String?) -> Unit)? = null,
+    onCallSupport: () -> Unit = {},
 ) {
     var tab by rememberSaveable { mutableStateOf(HomeTab.Home) }
     val state by vm.state.collectAsStateWithLifecycle()
     HomeEffects(vm, onOpenModule)
+    AskNotificationPermission()
 
-    Column(Modifier.fillMaxSize().background(AslTheme.colors.background)) {
+    Column(Modifier.fillMaxSize().background(AslTheme.colors.sheet)) {
         Box(Modifier.weight(1f)) {
             when (tab) {
-                HomeTab.Home -> HomeTabContent(state, vm, onAllServices, onEditServices, onNotifications, onWallet, onAddMoney, onSeeAll)
+                HomeTab.Home, HomeTab.Wallet -> ClassicHomeTab(
+                    state, vm, onAllServices, onEditServices, onNotifications, onWallet, onAddMoney, onSeeAll, onReport,
+                    onReportsTab = { tab = HomeTab.Reports }, onArrange = onArrange, onBbps = onBbps, onCallSupport = onCallSupport,
+                )
                 HomeTab.Reports -> reportsTab?.invoke() ?: PlaceholderTab(stringResource(R.string.tab_reports), AslIcons.Report)
-                HomeTab.Earnings -> PlaceholderTab(stringResource(R.string.tab_earnings), AslIcons.Earnings)
                 HomeTab.Profile -> profileTab?.invoke() ?: PlaceholderTab(stringResource(R.string.tab_profile), AslIcons.User, onLogout = vm::logout, extra = extraProfileAction)
             }
         }
         AslBottomNav(
             items = listOf(
                 NavItem(stringResource(R.string.tab_home), AslIcons.Home),
+                NavItem(stringResource(R.string.tab_wallet), AslIcons.Wallet),
                 NavItem(stringResource(R.string.tab_reports), AslIcons.Report),
-                NavItem(stringResource(R.string.tab_earnings), AslIcons.Earnings),
                 NavItem(stringResource(R.string.tab_profile), AslIcons.User),
             ),
             selected = tab.ordinal,
-            onSelect = { tab = HomeTab.entries[it] },
+            onSelect = { i ->
+                val t = HomeTab.entries[i]
+                if (t == HomeTab.Wallet && onWallet != null) onWallet() else tab = t
+            },
         )
     }
     ServiceSheetHost(state, vm)
@@ -224,160 +240,10 @@ internal fun openPartnerSite(context: Context, url: String): Boolean = try {
     false
 }
 
-// ---------------------------------------------------------------- Home tab
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun HomeTabContent(
-    state: HomeUiState,
-    vm: HomeViewModel,
-    onAllServices: () -> Unit,
-    onEditServices: () -> Unit,
-    onNotifications: () -> Unit,
-    onWallet: (() -> Unit)? = null,
-    onAddMoney: (() -> Unit)? = null,
-    onSeeAll: (() -> Unit)? = null,
-) {
-    val c = AslTheme.colors
-    PullToRefreshBox(isRefreshing = state.refreshing, onRefresh = { vm.refresh() }, modifier = Modifier.fillMaxSize()) {
-        Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().padding(horizontal = 16.dp).padding(bottom = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            HomeHeader(state, onNotifications)
-
-            when {
-                state.loading -> WalletSkeleton()
-                state.wallet != null -> {
-                    val w = state.wallet
-                    WalletCard(
-                        balance = w.balance,
-                        hidden = state.balanceHidden,
-                        onToggleHidden = vm::toggleBalance,
-                        subtitle = updatedLabel(w.updatedAt),
-                        earnedToday = if (w.commission.signum() > 0) stringResource(R.string.home_commission, Money.format(w.commission, showPaise = false)) else null,
-                        modifier = if (onWallet != null) Modifier.clickable(role = Role.Button, onClickLabel = stringResource(R.string.home_open_wallet), onClick = onWallet) else Modifier,
-                        actions = listOf(
-                            stringResource(R.string.home_add_money).let { it to (onAddMoney ?: { vm.onComingSoon(it) }) },
-                            stringResource(R.string.home_passbook).let { it to { vm.onComingSoon(it) } },
-                        ),
-                        labels = walletLabels(),
-                    )
-                }
-                else -> AslCard {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AlertBanner(AlertKind.Error, stringResource(R.string.home_error_title), message = stringResource(R.string.home_error_msg), icon = AslIcons.WifiOff)
-                        AslButton(stringResource(R.string.home_retry), { vm.refresh() }, style = AslButtonStyle.Outline, compact = true, icon = AslIcons.Refresh, loading = state.refreshing)
-                    }
-                }
-            }
-
-            AnimatedVisibility(state.offline, enter = fadeIn() + slideInVertically()) {
-                AlertBanner(AlertKind.Pending, stringResource(R.string.home_offline_title), message = stringResource(R.string.home_offline_msg), icon = AslIcons.WifiOff)
-            }
-
-            SectionHeader(stringResource(R.string.home_services), action = stringResource(R.string.home_edit), onAction = { vm.startEdit(); onEditServices() })
-            if (state.services.isEmpty()) {
-                ServicesSkeleton()
-            } else {
-                val all = ServiceItem(stringResource(R.string.home_all_services), AslIcons.More, AslGradients.Service.Neutral.colors)
-                val items = state.pinned.map { it.toItem() } + all
-                ServiceGrid(items, onClick = { item ->
-                    val idx = items.indexOf(item)
-                    if (idx == items.lastIndex) onAllServices() else vm.onServiceClick(state.pinned[idx])
-                })
-            }
-
-            if (state.user?.isDistributor == true) DistributorSection(vm)
-
-            // "See all" opens the wallet ledger (Module 6); without it, it says so.
-            val reports = stringResource(R.string.tab_reports)
-            SectionHeader(stringResource(R.string.home_recent), action = stringResource(R.string.home_see_all), onAction = { onSeeAll?.invoke() ?: vm.onComingSoon(reports) })
-            RecentList(state)
-        }
-    }
-}
+// ---------------------------------------------------------------- Home tab: see ClassicHome.kt
 
 @Composable
-private fun HomeHeader(state: HomeUiState, onNotifications: () -> Unit) {
-    val c = AslTheme.colors
-    val u = state.user
-    Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(
-            Modifier.size(44.dp).clip(CircleShape).background(Brush.linearGradient(AslGradients.action)),
-            contentAlignment = Alignment.Center,
-        ) { Text(u?.initials ?: "", style = AslTheme.type.label, color = Color.White) }
-        Column(Modifier.weight(1f)) {
-            Text(
-                "${greeting()}, ${u?.firstName.orEmpty()}",
-                style = AslTheme.type.title, color = c.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.semantics { heading() },
-            )
-            val sub = listOfNotNull(u?.shopName?.ifBlank { null }, u?.regno?.let { "R-$it" }).joinToString(" · ")
-            Text(sub, style = AslTheme.type.caption, color = c.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        IconBox(AslIcons.Bell, stringResource(R.string.home_notifications), onNotifications)
-    }
-}
-
-@Composable
-private fun greeting(): String {
-    val h = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
-    return stringResource(
-        when (h) {
-            in 4..11 -> R.string.home_greeting_morning
-            in 12..16 -> R.string.home_greeting_afternoon
-            else -> R.string.home_greeting_evening
-        },
-    )
-}
-
-/** "Updated just now / 4 min ago / at 10:42 am", refreshed every 30 s. */
-@Composable
-private fun updatedLabel(updatedAt: Long): String {
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(updatedAt) { while (true) { now = System.currentTimeMillis(); delay(30_000) } }
-    val mins = ((now - updatedAt).coerceAtLeast(0) / 60_000).toInt()
-    val context = LocalContext.current
-    return when {
-        mins < 1 -> stringResource(R.string.home_updated_now)
-        mins < 60 -> stringResource(R.string.home_updated_min, mins)
-        else -> stringResource(R.string.home_updated_at, DateFormat.getTimeFormat(context).format(Date(updatedAt)))
-    }
-}
-
-@Composable
-private fun walletLabels(): WalletCardLabels {
-    val title = stringResource(R.string.home_wallet_title)
-    val show = stringResource(R.string.home_show)
-    val hide = stringResource(R.string.home_hide)
-    val showBalance = stringResource(R.string.home_show_balance)
-    val hideBalance = stringResource(R.string.home_hide_balance)
-    val hidden = stringResource(R.string.home_balance_hidden)
-    val template = stringResource(R.string.home_balance_is, "%s")
-    return remember(title, show, hide, showBalance, hideBalance, hidden, template) {
-        WalletCardLabels(title, show, hide, showBalance, hideBalance, hidden) { template.replace("%s", it) }
-    }
-}
-
-@Composable
-private fun WalletSkeleton() {
-    Box(Modifier.fillMaxWidth().height(150.dp).clip(AslShapes.hero).shimmer())
-}
-
-@Composable
-private fun ServicesSkeleton() {
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        repeat(2) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
-                repeat(4) { Box(Modifier.size(52.dp).clip(AslShapes.tile).shimmer()) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DistributorSection(vm: HomeViewModel) {
+internal fun DistributorSection(vm: HomeViewModel) {
     SectionHeader(stringResource(R.string.dist_network))
     val items = listOf(
         ServiceItem(stringResource(R.string.dist_retailers), AslIcons.User, AslGradients.Service.Aeps.colors),
@@ -389,7 +255,7 @@ private fun DistributorSection(vm: HomeViewModel) {
 }
 
 @Composable
-private fun RecentList(state: HomeUiState) {
+internal fun RecentList(state: HomeUiState) {
     val c = AslTheme.colors
     when {
         state.recentLoading && state.recent.isEmpty() -> ListCard { Column(Modifier.padding(vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) { repeat(3) { SkeletonRow() } } }
@@ -429,7 +295,7 @@ fun ServiceSheetHost(state: HomeUiState, vm: HomeViewModel) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(onDismissRequest = vm::dismissSheet, sheetState = sheetState, containerColor = AslTheme.colors.surface, shape = AslShapes.sheet) {
         Column(
-            Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp).padding(bottom = 20.dp),
+            Modifier.fillMaxWidth().imePadding().navigationBarsPadding().padding(horizontal = 20.dp).padding(bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             val c = AslTheme.colors
@@ -478,7 +344,7 @@ fun AllServicesScreen(vm: HomeViewModel, onBack: () -> Unit) {
     val c = AslTheme.colors
     // Leaving by any route (toolbar, system Back, gesture) starts the next visit with an empty search.
     DisposableEffect(vm) { onDispose { vm.onQueryChange("") } }
-    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding()) {
+    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding().keyboardAware()) {
         AslTopBar(stringResource(R.string.home_all_services), onBack = onBack)
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp).navigationBarsPadding(),
@@ -513,7 +379,7 @@ fun EditServicesScreen(vm: HomeViewModel, onDone: () -> Unit) {
     val c = AslTheme.colors
     LaunchedEffect(Unit) { if (vm.state.value.editSelection == null) vm.startEdit() }
     val sel = state.editSelection.orEmpty()
-    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding()) {
+    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding().keyboardAware()) {
         AslTopBar(stringResource(R.string.home_edit_title), onBack = { vm.cancelEdit(); onDone() }, closeIcon = true)
         Column(
             Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
@@ -571,7 +437,7 @@ private fun EditRow(s: HomeService, position: Int?, full: Boolean, onToggle: () 
 @Composable
 fun NotificationsScreen(onBack: () -> Unit) {
     val c = AslTheme.colors
-    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding()) {
+    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding().keyboardAware()) {
         AslTopBar(stringResource(R.string.home_notifications), onBack = onBack)
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             StateView(AslIcons.Bell, StatePresets.emptyColors, stringResource(R.string.notif_empty_title), stringResource(R.string.notif_empty_msg))
@@ -584,7 +450,7 @@ fun NotificationsScreen(onBack: () -> Unit) {
 @Composable
 private fun PlaceholderTab(title: String, icon: ImageVector, onLogout: (() -> Unit)? = null, extra: (@Composable () -> Unit)? = null) {
     var confirm by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.fillMaxSize().statusBarsPadding().keyboardAware().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         StateView(icon, StatePresets.emptyColors, stringResource(R.string.tab_soon_title, title), stringResource(R.string.tab_soon_msg))
         extra?.invoke()
         if (onLogout != null) AslButton(stringResource(R.string.tab_logout), { confirm = true }, Modifier.fillMaxWidth(), style = AslButtonStyle.Danger)

@@ -1,5 +1,6 @@
 package com.asl.wallet.feature.home.data
 
+import com.asl.wallet.core.network.model.serviceRows
 import com.asl.wallet.core.common.format.Masking
 import com.asl.wallet.core.network.NetworkResult
 import com.asl.wallet.core.network.safeApiCall
@@ -26,6 +27,8 @@ interface HomeRepository {
     suspend fun services(): ServicesResult
     fun pins(regno: Long): Flow<List<String>?>
     suspend fun savePins(regno: Long, keys: List<String>)
+    fun sections(regno: Long): Flow<List<String>?>
+    suspend fun saveSections(regno: Long, keys: List<String>)
 }
 
 @Singleton
@@ -72,7 +75,8 @@ class HomeRepositoryImpl @Inject constructor(
     override suspend fun services(): ServicesResult {
         val r = safeApiCall(json) { api.services() }
         if (r is NetworkResult.Success) {
-            val list = ServiceCatalogue.fromServer(r.data)
+            val rows = serviceRows(r.data).mapNotNull { runCatching { json.decodeFromJsonElement(ServiceDto.serializer(), it) }.getOrNull() }
+            val list = ServiceCatalogue.fromServer(rows).takeIf { it.isNotEmpty() }?.let(ServiceCatalogue::withWalletServices).orEmpty()
             if (list.isNotEmpty()) { lastServices = list; return ServicesResult(list, fromServer = true) }
         }
         lastServices?.let { return ServicesResult(it, fromServer = true) }
@@ -81,6 +85,8 @@ class HomeRepositoryImpl @Inject constructor(
 
     override fun pins(regno: Long) = local.pins(regno)
     override suspend fun savePins(regno: Long, keys: List<String>) = local.savePins(regno, keys)
+    override fun sections(regno: Long) = local.sections(regno)
+    override suspend fun saveSections(regno: Long, keys: List<String>) = local.saveSections(regno, keys)
 
     companion object { const val RECENT_COUNT = 3 }
 }

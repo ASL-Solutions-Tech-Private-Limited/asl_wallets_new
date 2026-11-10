@@ -123,6 +123,18 @@ fun readRow(kind: ReportKind, o: JsonObject): ReportRow? {
                 o.amt("appCharges"), Statuses.of(o.str("tranStatus")), Day.parse(o.str("tranDate")), cleanTime(o.str("tranTime")), f, complaintOf(o), initials(name),
                 serverAllowsComplaint = o.bool("canComplain") != false)
         }
+        ReportKind.AddMoney -> {
+            // UAT 10 Nov 2026: {id, clientTxnId, orderId, amount, apiTag "PAYU", status SUCCESS/PENDING/FAILED,
+            // isPaymentComp ONE/ZERO, pInfo (the failure text on failures), inDate "10/11/2026", inTime "3:47:50 pm"}.
+            // The customer e-mail and mobile in each row are never read.
+            val txn = o.str("clientTxnId", "txnid") ?: servid
+            val via = o.str("apiTag")?.let { if (it.equals("PAYU", true)) "PayU" else it } ?: "PayU"
+            val status = Statuses.of(o.str("status"))
+            f.add(Field.Mode, via); f.add(Field.OrderId, o.str("orderId")); f.add(Field.TxnId, txn)
+            if (status == RowStatus.Failed) f.add(Field.Reason, o.str("pInfo")?.removePrefix("FAILED:")?.trim()?.takeIf { it.isNotEmpty() && !it.equals("No Error", true) }?.let(::safeServerMessage))
+            ReportRow(kind, txn, "Wallet top-up · $via", txn, o.amt("amount"), status,
+                Day.parse(o.str("inDate")), cleanTime(o.str("inTime")), f, null, "AM")
+        }
         ReportKind.Dmt -> {
             val name = o.str("beneficiaryName")?.replace(Regex("\\s+"), " ") ?: "Money transfer"
             val bank = o.str("beneficiaryBank")
@@ -191,6 +203,9 @@ fun readSummary(kind: ReportKind?, meta: JsonElement?, totalFromPaging: Int?): S
         ReportKind.Matm -> { put(TotalKind.Amount, s.amt("totalAmount")); put(TotalKind.Commission, s.amt("totalCommission")) }
         ReportKind.Pan -> put(TotalKind.Amount, s.amt("totalCharges"))
         ReportKind.Dmt -> { put(TotalKind.Amount, s.amt("totalAmount")); put(TotalKind.Success, s.amt("successAmount")); put(TotalKind.Failed, s.amt("failureAmount")) }
+        ReportKind.AddMoney -> {
+            put(TotalKind.Amount, s.amt("totalAmount")); put(TotalKind.Success, s.amt("successAmount")); put(TotalKind.Pending, s.amt("pendingAmount"))
+        }
     }
     return Summary(count, t)
 }
@@ -212,5 +227,7 @@ fun kindsFromServices(rows: List<JsonObject>): Set<ReportKind> {
     }
     // Send to bank is a wallet feature every retailer has (Module 4), so its report always shows.
     kinds += ReportKind.Payout
+    // Add money (PayU top-ups) is a wallet feature too.
+    kinds += ReportKind.AddMoney
     return kinds
 }

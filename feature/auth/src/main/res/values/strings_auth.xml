@@ -72,4 +72,11 @@
     <string name="lock_setup_none_title">This phone has no screen lock</string>
     <string name="lock_setup_none_body">Set a fingerprint, PIN, pattern or password in phone settings, then come back.</string>
     <string name="lock_setup_open_settings">Set a screen lock</string>
+    <!-- Classic sign-in -->
+    <string name="auth_logo_desc">ASL Wallet</string>
+    <string name="auth_powered_by">Powered by</string>
+    <string name="login_welcome_user">Welcome User!</string>
+    <string name="otp_verify_title">Verify OTP</string>
+    <string name="otp_resend_ring">Resend in %1$d s</string>
+    <string name="common_back">Back</string>
 </resources>

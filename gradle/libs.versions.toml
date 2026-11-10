@@ -1,4 +1,5 @@
 [versions]
+lottie = "6.6.7"
 agp = "9.2.1"
 kotlin = "2.3.20"
 ksp = "2.3.12"
@@ -28,6 +29,7 @@ espresso = "3.7.0"
 payuCheckoutPro = "3.4.0"
 
 [libraries]
+lottie-compose = { group = "com.airbnb.android", name = "lottie-compose", version.ref = "lottie" }
 payu-checkout-pro = { group = "in.payu", name = "payu-checkout-pro", version.ref = "payuCheckoutPro" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }

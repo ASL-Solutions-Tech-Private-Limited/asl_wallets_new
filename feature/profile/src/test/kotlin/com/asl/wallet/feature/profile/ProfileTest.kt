@@ -247,3 +247,27 @@ class SupportViewModelTest {
         assertThat(f.state.value.apiNotReady).isTrue()
     }
 }
+
+class ServiceStatusTest {
+    private fun svc(name: String, on: Boolean = true) = com.asl.wallet.feature.profile.domain.ActiveService(name, null, on)
+    private fun state(list: List<com.asl.wallet.feature.profile.domain.ServiceEntry>, s: com.asl.wallet.feature.profile.domain.AppService) = list.first { it.service == s }.state
+
+    @org.junit.Test fun `UAT services - AEPS, DMT and Recharge are active, Payout always, the rest not active`() {
+        val list = com.asl.wallet.feature.profile.domain.ServiceStatus.entries(listOf(svc("AEPS (YES BANK)"), svc("DMT"), svc("Recharge"), svc("AEPS (KOTAK BANK)")))
+        val A = com.asl.wallet.feature.profile.domain.ServiceState.Active
+        val N = com.asl.wallet.feature.profile.domain.ServiceState.NotActive
+        com.google.common.truth.Truth.assertThat(list).hasSize(com.asl.wallet.feature.profile.domain.AppService.entries.size)
+        for (s in listOf(com.asl.wallet.feature.profile.domain.AppService.Aeps, com.asl.wallet.feature.profile.domain.AppService.MoneyTransfer,
+            com.asl.wallet.feature.profile.domain.AppService.Payout, com.asl.wallet.feature.profile.domain.AppService.MobileRecharge,
+            com.asl.wallet.feature.profile.domain.AppService.DthRecharge)) com.google.common.truth.Truth.assertThat(state(list, s)).isEqualTo(A)
+        com.google.common.truth.Truth.assertThat(state(list, com.asl.wallet.feature.profile.domain.AppService.BillPayment)).isEqualTo(N)
+        com.google.common.truth.Truth.assertThat(list.takeWhile { it.state == A }).hasSize(5) // active ones first
+    }
+
+    @org.junit.Test fun `switched on but not built is Coming soon, switched off by the server is Not active`() {
+        val list = com.asl.wallet.feature.profile.domain.ServiceStatus.entries(listOf(svc("Micro ATM"), svc("BBPS", on = false), svc("Electricity Bill")))
+        com.google.common.truth.Truth.assertThat(state(list, com.asl.wallet.feature.profile.domain.AppService.MicroAtm)).isEqualTo(com.asl.wallet.feature.profile.domain.ServiceState.ComingSoon)
+        com.google.common.truth.Truth.assertThat(state(list, com.asl.wallet.feature.profile.domain.AppService.BillPayment)).isEqualTo(com.asl.wallet.feature.profile.domain.ServiceState.Active)
+        com.google.common.truth.Truth.assertThat(state(list, com.asl.wallet.feature.profile.domain.AppService.Aeps)).isEqualTo(com.asl.wallet.feature.profile.domain.ServiceState.NotActive)
+    }
+}

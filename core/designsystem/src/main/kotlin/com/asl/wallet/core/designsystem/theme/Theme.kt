@@ -26,6 +26,12 @@ import com.asl.wallet.core.designsystem.R
  * Screens must use these tokens only: no hex colours or raw font sizes in feature code.
  * ------------------------------------------------------------------------------------------- */
 
+/**
+ * Fill for selected / active marks that carry white content (check badges, the chosen chip, the active step):
+ * brand navy in light mode, a brighter blue in dark mode where navy would vanish into the background.
+ */
+val AslColors.accentFill: Color get() = if (isDark) Color(0xFF1E6FC0) else brandNavy
+
 @Immutable
 data class AslColors(
     val brandNavy: Color,
@@ -41,34 +47,48 @@ data class AslColors(
     val pending: Color, val pendingBg: Color,
     val error: Color, val errorBg: Color,
     val heroGradient: List<Color>,
+    /** Classic look: the old app's service-screen background and toolbar (navy → blue). */
+    val headerGradient: List<Color>,
+    /** Classic look: Home's top band (old dashboard blue). */
+    val homeGradient: List<Color>,
+    /** Classic look: Home's grey rounded sheet. */
+    val sheet: Color,
     val isDark: Boolean,
 )
 
+/* Classic look (branch ui/classic-look): the old ASL Wallet app's palette, navy #03274B and blues #0C4DA2 → #1E88E5. */
 val LightAslColors = AslColors(
-    brandNavy = Color(0xFF03274B), primary = Color(0xFF494FE6), primaryEnd = Color(0xFF8B5CFF),
-    background = Color(0xFFF3F5FC), surface = Color(0xFFFFFFFF), outline = Color(0xFFE4E8F3),
-    textPrimary = Color(0xFF0D1830), textSecondary = Color(0xFF5A6882), tint = Color(0xFFEEEFFF),
-    success = Color(0xFF138A4B), successBg = Color(0xFFE3F5EB),
-    pending = Color(0xFFA86200), pendingBg = Color(0xFFFFF2DC),
-    error = Color(0xFFC62828), errorBg = Color(0xFFFDE7E7),
-    heroGradient = listOf(Color(0xFF03274B), Color(0xFF16308C), Color(0xFF494FE6), Color(0xFF7B5CFF)),
+    brandNavy = Color(0xFF03274B), primary = Color(0xFF03274B), primaryEnd = Color(0xFF1976D2),
+    background = Color(0xFFEEF0F4), surface = Color(0xFFFFFFFF), outline = Color(0xFFDDE2EA),
+    textPrimary = Color(0xFF0B1F38), textSecondary = Color(0xFF5B6576), tint = Color(0xFFE4F3FF),
+    success = Color(0xFF1D7A3D), successBg = Color(0xFFE4F6EA),
+    pending = Color(0xFFC77700), pendingBg = Color(0xFFFFF3E0),
+    error = Color(0xFFC62828), errorBg = Color(0xFFFFEAEA),
+    heroGradient = listOf(Color(0xFF03274B), Color(0xFF0C4DA2), Color(0xFF1565C0), Color(0xFF1E88E5)),
+    headerGradient = listOf(Color(0xFF03274B), Color(0xFF1976D2)),
+    homeGradient = listOf(Color(0xFF0C4DA2), Color(0xFF1565C0), Color(0xFF1E88E5)),
+    sheet = Color(0xFFEDEDED),
     isDark = false,
 )
 
 val DarkAslColors = AslColors(
-    brandNavy = Color(0xFF0E2340), primary = Color(0xFF8A8FFF), primaryEnd = Color(0xFFA38BFF),
-    background = Color(0xFF070D19), surface = Color(0xFF111C30), outline = Color(0xFF21304A),
-    textPrimary = Color(0xFFE8EEF8), textSecondary = Color(0xFF93A2BA), tint = Color(0xFF1B2452),
-    success = Color(0xFF3CC27A), successBg = Color(0xFF0F2E22),
+    brandNavy = Color(0xFF041A33), primary = Color(0xFF64A8F0), primaryEnd = Color(0xFF8CC2F7),
+    background = Color(0xFF0A1220), surface = Color(0xFF131E2F), outline = Color(0xFF243247),
+    textPrimary = Color(0xFFE7EDF6), textSecondary = Color(0xFF97A4B8), tint = Color(0xFF14304F),
+    success = Color(0xFF4CC285), successBg = Color(0xFF10301F),
     pending = Color(0xFFF2B44B), pendingBg = Color(0xFF33270F),
     error = Color(0xFFFF6B6B), errorBg = Color(0xFF371616),
-    heroGradient = listOf(Color(0xFF0B1A3A), Color(0xFF1A2C7A), Color(0xFF4A46D8), Color(0xFF7452F0)),
+    heroGradient = listOf(Color(0xFF020F1F), Color(0xFF062E5C), Color(0xFF0B4A8F), Color(0xFF1360B0)),
+    headerGradient = listOf(Color(0xFF020F1F), Color(0xFF0B4A8F)),
+    homeGradient = listOf(Color(0xFF062E5C), Color(0xFF0B4A8F), Color(0xFF1360B0)),
+    sheet = Color(0xFF0E1726),
     isDark = true,
 )
 
 /** Gradients are for brand, action and celebration surfaces only; data and forms stay on flat surfaces. */
 object AslGradients {
-    val action = listOf(Color(0xFF494FE6), Color(0xFF6A55FF), Color(0xFF8B5CFF))
+    /** Main buttons: the old app's navy, shading to blue. */
+    val action = listOf(Color(0xFF03274B), Color(0xFF0C4DA2), Color(0xFF1565C0))
     val earnings = listOf(Color(0xFFFFC861), Color(0xFFFF8A3D))
     val success = listOf(Color(0xFF0F9D58), Color(0xFF34D399))
     val pending = listOf(Color(0xFFD97706), Color(0xFFFBBF24))
@@ -77,7 +97,7 @@ object AslGradients {
 
     /** One colour per service so retailers recognise services by colour first. */
     enum class Service(val colors: List<Color>) {
-        Aeps(listOf(Color(0xFF494FE6), Color(0xFF8B5CFF))),
+        Aeps(listOf(Color(0xFF1565C0), Color(0xFF2979FF))),
         MicroAtm(listOf(Color(0xFF0EA5A4), Color(0xFF22D3EE))),
         SendMoney(listOf(Color(0xFFFF5A7A), Color(0xFFFF9A6B))),
         Upi(listOf(Color(0xFF0F9D58), Color(0xFF4ADE80))),
@@ -92,31 +112,47 @@ object AslGradients {
     fun brush(colors: List<Color>): Brush = Brush.linearGradient(colors)
 }
 
-val NotoSans = FontFamily(
-    Font(R.font.noto_sans_regular, FontWeight.Normal),
-    Font(R.font.noto_sans_medium, FontWeight.Medium),
-    Font(R.font.noto_sans_semibold, FontWeight.SemiBold),
-    Font(R.font.noto_sans_bold, FontWeight.Bold),
-    Font(R.font.noto_sans_extrabold, FontWeight.ExtraBold),
-    Font(R.font.noto_sans_black, FontWeight.Black),
+/**
+ * Gilroy, the old app's font (chosen 7 Nov 2026; ASL must hold a mobile-app licence for it). It has Latin only:
+ * Hindi and Bengali text falls back to the phone's own fonts automatically.
+ */
+/** Poppins: the old app's font for section titles, tiles, buttons and body text (Gilroy is for headings and amounts). */
+val Poppins = FontFamily(
+    Font(R.font.poppins_regular, FontWeight.Normal),
+    Font(R.font.poppins_medium, FontWeight.Medium),
+    Font(R.font.poppins_semibold, FontWeight.SemiBold),
+    Font(R.font.poppins_bold, FontWeight.Bold),
+    Font(R.font.poppins_bold, FontWeight.ExtraBold),
+    Font(R.font.poppins_bold, FontWeight.Black),
+)
+
+val Gilroy = FontFamily(
+    Font(R.font.gilroy_light, FontWeight.Light),
+    Font(R.font.gilroy_regular, FontWeight.Normal),
+    Font(R.font.gilroy_medium, FontWeight.Medium),
+    Font(R.font.gilroy_semi_bold, FontWeight.SemiBold),
+    Font(R.font.gilroy_bold, FontWeight.Bold),
+    Font(R.font.gilroy_heavy, FontWeight.ExtraBold),
+    Font(R.font.gilroy_heavy, FontWeight.Black),
 )
 
 /** Type scale (sp scales with the phone's font setting). Minimum anywhere is [micro] = 11.5 sp. */
 @Immutable
 data class AslType(
-    val amountDisplay: TextStyle = style(32, FontWeight.Black, -0.4),
-    val amountWallet: TextStyle = style(28, FontWeight.Black, -0.4),
-    val headline: TextStyle = style(22, FontWeight.ExtraBold),
-    val title: TextStyle = style(18, FontWeight.ExtraBold),
-    val bodyStrong: TextStyle = style(16, FontWeight.Bold),
-    val body: TextStyle = style(14, FontWeight.Medium),
-    val label: TextStyle = style(13, FontWeight.Bold),
-    val caption: TextStyle = style(12, FontWeight.SemiBold),
-    val micro: TextStyle = style(11.5, FontWeight.ExtraBold),
+    // As in the old app: Gilroy for headings and amounts, Poppins for everything else.
+    val amountDisplay: TextStyle = style(32, FontWeight.Bold, 0.0),
+    val amountWallet: TextStyle = style(28, FontWeight.Bold, 0.0),
+    val headline: TextStyle = style(22, FontWeight.Bold, 0.4),
+    val title: TextStyle = style(18, FontWeight.Bold, 0.5),
+    val bodyStrong: TextStyle = style(16, FontWeight.Bold, 0.4),
+    val body: TextStyle = style(14, FontWeight.Normal, font = Poppins),
+    val label: TextStyle = style(13, FontWeight.Medium, font = Poppins),
+    val caption: TextStyle = style(12, FontWeight.Normal, font = Poppins),
+    val micro: TextStyle = style(11.5, FontWeight.Medium, font = Poppins),
 )
 
-private fun style(size: Number, weight: FontWeight, tracking: Double = 0.0) = TextStyle(
-    fontFamily = NotoSans,
+private fun style(size: Number, weight: FontWeight, tracking: Double = 0.0, font: FontFamily = Gilroy) = TextStyle(
+    fontFamily = font,
     fontWeight = weight,
     fontSize = size.toFloat().sp,
     lineHeight = (size.toFloat() * 1.35f).sp,
@@ -124,13 +160,15 @@ private fun style(size: Number, weight: FontWeight, tracking: Double = 0.0) = Te
 )
 
 object AslShapes {
-    val chip = RoundedCornerShape(12.dp)
-    val field = RoundedCornerShape(14.dp)
-    val button = RoundedCornerShape(16.dp)
-    val card = RoundedCornerShape(18.dp)
-    val hero = RoundedCornerShape(22.dp)
-    val sheet = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-    val tile = RoundedCornerShape(17.dp)
+    val chip = RoundedCornerShape(10.dp)
+    val field = RoundedCornerShape(10.dp)
+    val button = RoundedCornerShape(12.dp)
+    val card = RoundedCornerShape(12.dp)
+    val hero = RoundedCornerShape(16.dp)
+    val sheet = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+    val tile = RoundedCornerShape(14.dp)
+    /** The old app's toolbar: square top, rounded bottom. */
+    val header = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp)
     val pill = RoundedCornerShape(50)
 }
 

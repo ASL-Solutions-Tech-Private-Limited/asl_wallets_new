@@ -24,6 +24,7 @@ dependencies {
     implementation(project(":core:network"))
     implementation(project(":core:security"))
     implementation(libs.androidx.browser)
+    implementation(libs.androidx.activity.compose)
 
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.lifecycle.runtime.compose)

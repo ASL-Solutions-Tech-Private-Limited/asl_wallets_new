@@ -11,6 +11,7 @@ import com.asl.wallet.feature.dmt.domain.CustomerLookup
 import com.asl.wallet.feature.dmt.domain.DmtBank
 import com.asl.wallet.feature.dmt.domain.DmtOutcome
 import com.asl.wallet.feature.dmt.domain.DmtReceipt
+import com.asl.wallet.feature.dmt.domain.DmtRules
 import com.asl.wallet.feature.dmt.domain.DmtStatus
 import com.asl.wallet.feature.dmt.domain.Gender
 import com.asl.wallet.feature.dmt.domain.OtpPurpose
@@ -104,7 +105,7 @@ class DmtRepositoryImpl @Inject constructor(private val api: DmtApi, private val
     override suspend fun checkName(form: RecipientForm): NetworkResult<String> {
         val r = safeApiCall(json) { api.checkName(NameCheckRequest(form.account, form.ifsc.uppercase(), form.mobile, form.bank!!.name, isExist = 0)) }
         return when (r) {
-            is NetworkResult.Success -> innerFailure(r.data) ?: readName(r.data)?.let { NetworkResult.Success(it, r.message) }
+            is NetworkResult.Success -> innerFailure(r.data) ?: readName(r.data)?.let { NetworkResult.Success(DmtRules.cleanName(it), r.message) }
                 ?: NetworkResult.Failure.Api(422, "NAME_EMPTY", r.message?.let(::safeServerMessage) ?: "The bank didn't return a name.")
             is NetworkResult.Failure -> r
         }
@@ -113,9 +114,10 @@ class DmtRepositoryImpl @Inject constructor(private val api: DmtApi, private val
     override suspend fun addRecipient(customerMobile: String, form: RecipientForm) = checked {
         api.addRecipient(
             AddRecipientRequest(
-                phone = customerMobile, beneficiaryName = (form.bankName ?: form.name).trim().uppercase(), beneficiaryAccNo = form.account,
+                phone = customerMobile, beneficiaryName = DmtRules.cleanName(form.name).uppercase(), beneficiaryAccNo = form.account,
                 bankIfscCod = form.ifsc.uppercase(), beneficiaryBankName = form.bank!!.name, beneficiaryMobileNumber = form.mobile, trnasferMode = TransferMode.Imps.api,
-                isVerified = if (form.verified) "1" else "0",
+                // 1 = the bank name check was done for this account (even if the name was edited after), else 0.
+                isVerified = if (form.nameChecked) "1" else "0",
             ),
         )
     }

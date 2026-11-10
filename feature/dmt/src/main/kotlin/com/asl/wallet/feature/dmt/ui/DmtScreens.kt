@@ -1,5 +1,7 @@
 package com.asl.wallet.feature.dmt.ui
 
+import com.asl.wallet.core.designsystem.component.keyboardAware
+import androidx.compose.foundation.layout.imePadding
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -70,7 +72,8 @@ import com.asl.wallet.core.designsystem.component.ListCard
 import com.asl.wallet.core.designsystem.component.ListRow
 import com.asl.wallet.core.designsystem.component.OtpInput
 import com.asl.wallet.core.designsystem.component.ProcessingScreen
-import com.asl.wallet.core.designsystem.component.ReceiptActionBar
+import com.asl.wallet.core.designsystem.component.BillLabels
+import com.asl.wallet.core.designsystem.component.BillReceipt
 import com.asl.wallet.core.designsystem.component.ReceiptCard
 import com.asl.wallet.core.designsystem.component.ResultKind
 import com.asl.wallet.core.designsystem.component.ResultView
@@ -110,7 +113,7 @@ import java.math.BigDecimal
 private fun Scaffold(title: String, onBack: (() -> Unit)?, secure: Boolean = false, bottom: (@Composable ColumnScope.() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
     val c = AslTheme.colors
     if (secure) SecureScreen()
-    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding()) {
+    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding().keyboardAware()) {
         AslTopBar(title, onBack = onBack)
         Column(
             Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 16.dp)
@@ -148,7 +151,7 @@ private fun Sheet(onDismiss: () -> Unit, dismissible: Boolean = true, content: @
         properties = ModalBottomSheetProperties(securePolicy = if (dismissible) SecureFlagPolicy.Inherit else SecureFlagPolicy.SecureOn, shouldDismissOnBackPress = dismissible),
         containerColor = AslTheme.colors.surface, shape = AslShapes.sheet,
     ) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp).padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
+        Column(Modifier.fillMaxWidth().imePadding().navigationBarsPadding().padding(horizontal = 16.dp).padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
     }
 }
 
@@ -190,7 +193,7 @@ fun DmtScreen(
             ResultView(ResultKind.Ok, stringResource(R.string.d_recipient_saved), stringResource(R.string.d_ready_to_send), listOfNotNull(
                 KeyValue(stringResource(R.string.d_name), (s.form.bankName ?: s.form.name).uppercase()),
                 KeyValue(stringResource(R.string.d_bank), "${s.form.bank?.name.orEmpty()} ••${s.form.account.takeLast(4)}"),
-                KeyValue(stringResource(R.string.d_name_check), stringResource(if (s.form.verified) R.string.d_verified else R.string.d_not_verified)),
+                KeyValue(stringResource(R.string.d_name_check), stringResource(if (s.form.nameChecked) R.string.d_verified else R.string.d_not_verified)),
             ))
         }
         DmtPage.Amount -> AmountPage(s, vm)
@@ -329,7 +332,7 @@ private fun AddRecipientPage(s: DmtState, vm: DmtViewModel) {
     val p = if (s.showErrors) f.problems() else emptySet()
     val c = AslTheme.colors
     Scaffold(stringResource(R.string.d_add_recipient), { vm.back() }, secure = true, bottom = {
-        AslPrimaryButton(stringResource(R.string.d_save_recipient), vm::saveRecipient, loading = s.busy, enabled = (s.nameCheck as? NameCheck.Done)?.differs != true)
+        AslPrimaryButton(stringResource(R.string.d_save_recipient), vm::saveRecipient, loading = s.busy)
     }) {
         HeaderText(stringResource(R.string.d_bank))
         ListCard { ListRow(f.bank?.name ?: stringResource(R.string.d_choose_bank), icon = AslIcons.Bank, onClick = { vm.loadBanks(); bankSheet = true }) }
@@ -348,10 +351,11 @@ private fun AddRecipientPage(s: DmtState, vm: DmtViewModel) {
         when (val n = s.nameCheck) {
             NameCheck.Idle, NameCheck.Confirm -> AslButton(stringResource(R.string.d_check_name, rupees(DmtRules.NAME_CHECK_FEE)), vm::askNameCheck, Modifier.fillMaxWidth(), style = AslButtonStyle.Outline, icon = AslIcons.Shield)
             NameCheck.Loading -> AslButton(stringResource(R.string.d_checking_name), {}, Modifier.fillMaxWidth(), style = AslButtonStyle.Outline, loading = true)
-            is NameCheck.Done -> if (n.differs) {
-                AlertBanner(AlertKind.Pending, stringResource(R.string.d_name_differs), message = stringResource(R.string.d_name_differs_msg, f.name, n.bankName))
-                AslPrimaryButton(stringResource(R.string.d_use_bank_name), vm::useBankName)
-            } else AlertBanner(AlertKind.Success, stringResource(R.string.d_bank_says, n.bankName), message = stringResource(R.string.d_account_active))
+            // The bank's name is already in the field; a different typed name is only a small warning under it.
+            is NameCheck.Done -> if (n.typed != null) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                androidx.compose.material3.Icon(AslIcons.Alert, null, Modifier.padding(top = 2.dp).height(16.dp), tint = c.pending)
+                Text(stringResource(R.string.d_name_differs_msg, n.typed), style = AslTheme.type.caption, color = c.pending)
+            }
             is NameCheck.Error -> AlertBanner(AlertKind.Error, errorText(n.e))
         }
         Note(stringResource(R.string.d_name_check_note))
@@ -472,66 +476,47 @@ private fun OtpSheet(s: DmtState, vm: DmtViewModel) = Sheet(vm::closeOtp, dismis
 
 @Composable
 private fun ResultPage(s: DmtState, vm: DmtViewModel, shop: ShopInfo, onHome: () -> Unit, onCall: () -> Unit, onWhatsApp: () -> Unit) {
-    val context = LocalContext.current
     val title = stringResource(R.string.d_receipt)
     BackHandler(onBack = vm::backToCustomer)
-    when (val o = s.outcome) {
-        is DmtOutcome.Sent -> {
-            val doc = receiptDoc(o.receipt)
-            var printChoice by remember { mutableStateOf(false) }
-            val shareTitle = stringResource(R.string.d_share_title)
-            Scaffold(title, vm::backToCustomer, secure = true, bottom = {
-                AslPrimaryButton(stringResource(R.string.d_another_recipient), vm::backToCustomer)
-                AslButton(stringResource(R.string.d_home), onHome, Modifier.fillMaxWidth(), style = AslButtonStyle.Outline, icon = AslIcons.Home)
-            }) {
-                val labels = listOf(stringResource(R.string.d_share), stringResource(R.string.d_pdf), stringResource(R.string.d_print), stringResource(R.string.d_help))
-                ReceiptCard(shop, doc.title, rupees(o.receipt.amount), Status.Success, doc.rows.map { KeyValue(it.first, it.second) }, footer = doc.footer,
-                    statusLabel = stringResource(R.string.d_success), amountWords = AmountInWords.english(o.receipt.amount), barcodeSeed = o.receipt.txnId, animate = true) {
-                    ReceiptActionBar(
-                        onWhatsApp = { ReceiptExport.shareText(context, shareTitle, ReceiptExport.text(shop, doc)) },
-                        onSavePdf = { ReceiptExport.sharePdf(context, shop, doc, shareTitle, "ASL-money-transfer.pdf") },
-                        onPrint = { printChoice = true }, onHelp = onCall, labels = labels,
-                    )
-                }
-            }
-            if (printChoice) Sheet({ printChoice = false }) {
-                Text(stringResource(R.string.d_print_title), style = AslTheme.type.title, color = AslTheme.colors.textPrimary)
-                ListCard {
-                    ListRow(stringResource(R.string.d_print_thermal), icon = AslIcons.Print, onClick = { printChoice = false; context.findActivity()?.let { ReceiptExport.print(it, shareTitle, ReceiptExport.html(shop, doc, true), true) } }); Divider()
-                    ListRow(stringResource(R.string.d_print_a4), icon = AslIcons.Document, onClick = { printChoice = false; context.findActivity()?.let { ReceiptExport.print(it, shareTitle, ReceiptExport.html(shop, doc, false), false) } })
-                }
-            }
-        }
-        is DmtOutcome.Pending -> Scaffold(title, null, secure = true, bottom = {
-            AslPrimaryButton(stringResource(R.string.d_back_customer), vm::backToCustomer)
-        }) {
-            ResultView(ResultKind.Warn, stringResource(R.string.d_pending_title), stringResource(R.string.d_pending_sub), listOfNotNull(
-                KeyValue(stringResource(R.string.d_to), "${o.receipt.recipient} · ••${o.receipt.last4}"),
-                KeyValue(stringResource(R.string.d_amount), rupees(o.receipt.amount)),
-                o.receipt.txnId?.let { KeyValue(stringResource(R.string.d_txn_id), it) },
-            ))
+    // Every outcome prints the same bill as Reports, stamped Success / Pending / Failed.
+    val (receipt, status, word) = when (val o = s.outcome) {
+        is DmtOutcome.Sent -> Triple(o.receipt, Status.Success, stringResource(R.string.d_success))
+        is DmtOutcome.Pending -> Triple(o.receipt, Status.Pending, stringResource(R.string.d_pending))
+        is DmtOutcome.Failed -> Triple(o.receipt, Status.Failed, stringResource(R.string.d_failed))
+        is DmtOutcome.WrongOtp, is DmtOutcome.Refused, null -> return
+    }
+    val o = s.outcome
+    val extra = if (o is DmtOutcome.Failed) listOf(
+        stringResource(R.string.d_amount) to stringResource(R.string.d_returned, rupees(receipt.amount)),
+        stringResource(R.string.d_reason) to (o.reason?.let(::safeServerMessage) ?: stringResource(R.string.d_reason_unknown)),
+    ) else emptyList()
+    val doc = receiptDoc(receipt, word, extra)
+    Scaffold(title, vm::backToCustomer, secure = true, bottom = {
+        AslPrimaryButton(stringResource(if (o is DmtOutcome.Sent) R.string.d_another_recipient else R.string.d_back_customer), vm::backToCustomer)
+        if (o !is DmtOutcome.Pending) AslButton(stringResource(R.string.d_home), onHome, Modifier.fillMaxWidth(), style = AslButtonStyle.Outline, icon = AslIcons.Home)
+    }) {
+        BillReceipt(
+            shop, doc, status,
+            BillLabels(
+                listOf(stringResource(R.string.d_share), stringResource(R.string.d_pdf), stringResource(R.string.d_print), stringResource(R.string.d_help)),
+                stringResource(R.string.d_share_title), stringResource(R.string.d_print_title), stringResource(R.string.d_print_thermal), stringResource(R.string.d_print_a4),
+            ),
+            fileName = "ASL-money-transfer.pdf", onHelp = onCall,
+            amountWords = AmountInWords.english(receipt.amount), barcodeSeed = receipt.txnId,
+            voice = if (o is DmtOutcome.Sent) stringResource(R.string.d_voice, com.asl.wallet.core.designsystem.component.spokenRupees(receipt.amount)) else null,
+        )
+        if (o is DmtOutcome.Pending) {
             AlertBanner(AlertKind.Pending, stringResource(R.string.d_held), message = stringResource(R.string.d_held_msg))
             HelpCard(onComplaint = onCall, onWhatsApp = onWhatsApp, onCall = onCall, title = stringResource(R.string.d_need_help))
         }
-        is DmtOutcome.Failed -> Scaffold(title, null, secure = true, bottom = {
-            AslPrimaryButton(stringResource(R.string.d_back_customer), vm::backToCustomer)
-            AslButton(stringResource(R.string.d_home), onHome, Modifier.fillMaxWidth(), style = AslButtonStyle.Outline)
-        }) {
-            ResultView(ResultKind.Bad, stringResource(R.string.d_failed_title), stringResource(R.string.d_failed_sub), listOfNotNull(
-                KeyValue(stringResource(R.string.d_to), "${o.receipt.recipient} · ••${o.receipt.last4}"),
-                KeyValue(stringResource(R.string.d_amount), stringResource(R.string.d_returned, rupees(o.receipt.amount))),
-                KeyValue(stringResource(R.string.d_reason), o.reason?.let(::safeServerMessage) ?: stringResource(R.string.d_reason_unknown)),
-            ))
-        }
-        is DmtOutcome.WrongOtp, is DmtOutcome.Refused, null -> Unit
     }
 }
 
 /** Customer receipt: masked numbers, no retailer commission. */
 @Composable
-private fun receiptDoc(r: DmtReceipt) = ReceiptDoc(
+private fun receiptDoc(r: DmtReceipt, status: String, extra: List<Pair<String, String>> = emptyList()) = ReceiptDoc(
     title = stringResource(R.string.d_receipt_title),
-    status = stringResource(R.string.d_success),
+    status = status,
     amount = rupees(r.amount),
     rows = listOfNotNull(
         stringResource(R.string.d_sender) to "${r.customerName} · ${Masking.mobile(r.customerMobile)}",
@@ -542,6 +527,6 @@ private fun receiptDoc(r: DmtReceipt) = ReceiptDoc(
         r.bankRefs.takeIf { it.isNotEmpty() }?.let { stringResource(R.string.d_bank_ref) to it.joinToString(", ") },
         r.txnId?.let { stringResource(R.string.d_txn_id) to it },
         r.time.takeIf { it.isNotBlank() }?.let { stringResource(R.string.d_date) to it },
-    ),
+    ) + extra,
     footer = stringResource(R.string.d_receipt_note),
 )

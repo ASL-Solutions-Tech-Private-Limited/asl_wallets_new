@@ -182,4 +182,30 @@
     <string name="ae_receipt_share_title">AEPS রসিদ</string>
     <string name="ae_setup_row">AEPS সেট-আপ</string>
     <string name="ae_due_count">%1$dটি বাকি</string>
+    <!-- Receipt stamp words (bill for every outcome) -->
+    <string name="ae_s_pending">পেন্ডিং</string>
+    <string name="ae_s_failed">ব্যর্থ</string>
+    <string name="ae_reason">কারণ</string>
+    <!-- Transaction form (10 Nov 2026) -->
+    <string name="ae_step_fill">তথ্য</string>
+    <string name="ae_step_scan">আঙুল স্ক্যান</string>
+    <string name="ae_step_receipt">রসিদ</string>
+    <string name="ae_ask_withdraw">গ্রাহক কত নগদ চান?</string>
+    <string name="ae_ask_deposit">গ্রাহক কত নগদ জমা দিচ্ছেন?</string>
+    <string name="ae_pick_bank">গ্রাহকের ব্যাংক বেছে নিন</string>
+    <string name="ae_pick_bank_sub">আধারের সাথে যুক্ত ব্যাংক</string>
+    <string name="ae_bank_of_customer">গ্রাহকের ব্যাংক (আধারের সাথে যুক্ত)</string>
+    <string name="ae_choose_btn">বেছে নিন</string>
+    <!-- Aadhaar consent (10 Nov 2026) -->
+    <string name="ae_consent">আমি আধার সম্মতি পড়েছি এবং গ্রাহক সম্মত</string>
+    <string name="ae_consent_read">পড়ুন</string>
+    <string name="ae_consent_title">আধার সম্মতি</string>
+    <string name="ae_consent_text">আমি, গ্রাহক, ব্যাংক ও ASL-কে আমার আধার নম্বর ও আঙুলের ছাপ (বা মুখ) শুধু UIDAI-এর মাধ্যমে আমাকে যাচাই করতে এবং এই AePS লেনদেন সম্পূর্ণ করতে ব্যবহারের সম্মতি দিচ্ছি। আমি জানি আমার বায়োমেট্রিক তথ্য সংরক্ষণ করা হয় না, রসিদে আধার নম্বর লুকিয়ে দেখানো হয়, এবং আমি তা দিতে অস্বীকার করতে পারি।</string>
+    <string name="ae_consent_ok">গ্রাহক সম্মত</string>
+    <!-- Voice after the receipt -->
+    <string name="ae_voice_withdraw">নগদ তোলা সফল। %1$s টাকা তোলা হয়েছে।</string>
+    <string name="ae_voice_deposit">নগদ জমা সফল। %1$s টাকা জমা হয়েছে।</string>
+    <string name="ae_voice_balance_done">ব্যালেন্স জানা সফল।</string>
+    <string name="ae_voice_statement">মিনি স্টেটমেন্ট তৈরি।</string>
+    <string name="ae_voice_available">উপলব্ধ ব্যালেন্স %1$s টাকা।</string>
 </resources>

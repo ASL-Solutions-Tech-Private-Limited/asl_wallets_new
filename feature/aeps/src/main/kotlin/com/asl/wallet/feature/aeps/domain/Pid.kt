@@ -48,7 +48,13 @@ object Pid {
         "startek l1" to "com.acpl.registersdk_l1",
         "faceauth" to "in.gov.uidai.facerd",
         "face auth" to "in.gov.uidai.facerd",
+        // UAT debug demo scanner: answered by this app itself (only the uatDebug build has the capture screen).
+        DEMO_DEVICE to SELF_PACKAGE,
     )
+
+    const val DEMO_DEVICE = "asl demo scanner (uat)"
+    /** Stands for "this app's own package" (resolved when the capture starts). */
+    const val SELF_PACKAGE = "@self"
     const val FINGER_ACTION = "in.gov.uidai.rdservice.fp.CAPTURE"
     const val FACE_ACTION = "in.gov.uidai.rdservice.face.CAPTURE"
 }

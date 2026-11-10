@@ -72,4 +72,11 @@
     <string name="lock_setup_none_title">এই ফোনে কোনো স্ক্রিন লক নেই</string>
     <string name="lock_setup_none_body">ফোনের সেটিংসে আঙুলের ছাপ, PIN, প্যাটার্ন বা পাসওয়ার্ড সেট করে ফিরে আসুন।</string>
     <string name="lock_setup_open_settings">স্ক্রিন লক সেট করুন</string>
+    <!-- Classic sign-in -->
+    <string name="auth_logo_desc">ASL ওয়ালেট</string>
+    <string name="auth_powered_by">সহযোগিতায়</string>
+    <string name="login_welcome_user">স্বাগতম!</string>
+    <string name="otp_verify_title">OTP যাচাই করুন</string>
+    <string name="otp_resend_ring">%1$d সে.-এ আবার পাঠান</string>
+    <string name="common_back">ফিরে যান</string>
 </resources>

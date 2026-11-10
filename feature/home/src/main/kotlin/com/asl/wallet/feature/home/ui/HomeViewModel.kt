@@ -6,6 +6,8 @@ import com.asl.wallet.core.common.session.CurrentUser
 import com.asl.wallet.core.common.session.UserSummary
 import com.asl.wallet.core.network.NetworkResult
 import com.asl.wallet.feature.home.data.HomeRepository
+import com.asl.wallet.feature.home.domain.HomeLayout
+import com.asl.wallet.feature.home.domain.HomeSection
 import com.asl.wallet.feature.home.domain.HomeService
 import com.asl.wallet.feature.home.domain.LedgerEntry
 import com.asl.wallet.feature.home.domain.ServiceCatalogue
@@ -63,6 +65,10 @@ data class HomeUiState(
     val query: String = "",
     /** Keys being edited on "Edit Home services"; null when not editing. */
     val editSelection: List<String>? = null,
+    /** The retailer's Home section order (Arrange Home). */
+    val sections: List<HomeSection> = HomeLayout.DEFAULT,
+    /** The order being arranged on Arrange Home; null when not arranging. */
+    val arranging: List<HomeSection>? = null,
 ) {
     val searchResults: List<HomeService> get() = ServiceCatalogue.search(services, query)
     fun grouped(list: List<HomeService> = searchResults): Map<ServiceGroup, List<HomeService>> =
@@ -92,6 +98,11 @@ class HomeViewModel @Inject constructor(
             currentUser.user.map { it?.regno }.distinctUntilChanged()
                 .flatMapLatest { regno -> if (regno == null) emptyFlow() else repo.pins(regno) }
                 .collect { keys -> savedPins = keys; repin() }
+        }
+        viewModelScope.launch {
+            currentUser.user.map { it?.regno }.distinctUntilChanged()
+                .flatMapLatest { regno -> if (regno == null) emptyFlow() else repo.sections(regno) }
+                .collect { keys -> _state.update { it.copy(sections = HomeLayout.parse(keys)) } }
         }
         viewModelScope.launch {
             repo.cached()?.let { snap ->
@@ -208,6 +219,25 @@ class HomeViewModel @Inject constructor(
     }
 
     fun cancelEdit() = _state.update { it.copy(editSelection = null) }
+
+    // ---- Arrange Home (section order) ----
+    fun startArrange() = _state.update { it.copy(arranging = it.sections) }
+
+    fun moveSection(from: Int, to: Int) = _state.update { s ->
+        val list = s.arranging ?: return@update s
+        s.copy(arranging = HomeLayout.move(list, from, to))
+    }
+
+    fun resetArrange() = _state.update { it.copy(arranging = HomeLayout.DEFAULT) }
+
+    fun saveArrange() {
+        val order = _state.value.arranging ?: return
+        val regno = _state.value.user?.regno
+        _state.update { it.copy(sections = order, arranging = null) }
+        if (regno != null) viewModelScope.launch { repo.saveSections(regno, HomeLayout.keys(order)) }
+    }
+
+    fun cancelArrange() = _state.update { it.copy(arranging = null) }
 
     fun logout() { viewModelScope.launch { currentUser.logout() } }
 

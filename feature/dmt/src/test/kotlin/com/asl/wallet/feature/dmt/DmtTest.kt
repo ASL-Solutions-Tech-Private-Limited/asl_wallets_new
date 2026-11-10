@@ -348,7 +348,7 @@ class DmtViewModelTest {
         assertThat(vm.state.value.otpFor).isEqualTo(OtpFor.Customer)
     }
 
-    @Test fun `name check is optional and asks before spending, a different name blocks saving until chosen`() = runTest {
+    @Test fun `name check is optional and asks before spending, the bank's name fills the field and a different name only warns`() = runTest {
         val repo = FakeRepo()
         val vm = DmtViewModel(repo, FakeRecent(), FakeUser())
         vm.onMobile("9876543210"); vm.lookup(); advanceUntilIdle(); vm.startAddRecipient(); advanceUntilIdle()
@@ -358,12 +358,36 @@ class DmtViewModelTest {
         assertThat(vm.state.value.nameCheck).isEqualTo(NameCheck.Confirm)
         assertThat(repo.nameChecks).isEqualTo(0) // nothing spent before the retailer confirms
         vm.runNameCheck(); advanceUntilIdle()
-        assertThat((vm.state.value.nameCheck as NameCheck.Done).differs).isTrue()
+        val done = vm.state.value.nameCheck as NameCheck.Done
+        assertThat(done.typed).isEqualTo("Rakesh Kumar") // shown as the warning
+        assertThat(vm.state.value.form.name).isEqualTo(done.bankName) // the field now holds the bank's name
         vm.saveRecipient(); advanceUntilIdle()
-        assertThat(vm.state.value.otpFor).isNull()
-        vm.useBankName(); vm.saveRecipient(); advanceUntilIdle()
         assertThat(vm.state.value.otpFor).isEqualTo(OtpFor.Recipient)
         assertThat(vm.state.value.form.verified).isTrue()
+    }
+
+    @Test fun `bank names with titles, hyphens and double spaces are valid`() {
+        val bank = "Mr. MD INJAMAM-UL  HOQUE" // real UAT answer, 9 Nov 2026
+        val ok = RecipientForm(DmtBank("1", "SBI", "SBIN0000001"), "32840110063874", "32840110063874", "SBIN0000001", bank, "9123456780", bankName = DmtRules.cleanName(bank))
+        assertThat(ok.problems()).isEmpty()
+        assertThat(ok.verified).isTrue()
+        assertThat(DmtRules.cleanName(bank)).isEqualTo("Mr. MD INJAMAM-UL HOQUE")
+        assertThat(RecipientForm.NAME.matches("RAM S/O SHYAM (HUF)")).isTrue()
+        assertThat(RecipientForm.NAME.matches("RAM123")).isFalse()
+        assertThat(DmtRules.namesDiffer("md injamam", bank)).isFalse() // "Mr." isn't the first name
+        assertThat(DmtRules.namesDiffer("Demo", bank)).isTrue()
+    }
+
+    @Test fun `isVerified is 1 whenever the name check was done, even after editing the name`() = runTest {
+        val vm = DmtViewModel(FakeRepo(), FakeRecent(), FakeUser())
+        vm.onMobile("9876543210"); vm.lookup(); advanceUntilIdle(); vm.startAddRecipient(); advanceUntilIdle()
+        vm.onBank(DmtBank("1", "UCO Bank", "UCBA0003284")); vm.onAccount("32840110063874"); vm.onConfirm("32840110063874"); vm.onRecipientMobile("9123456780")
+        assertThat(vm.state.value.form.nameChecked).isFalse() // no check → 0
+        vm.askNameCheck(); vm.runNameCheck(); advanceUntilIdle()
+        vm.onRecipientName("Nikhil K")
+        assertThat(vm.state.value.form.nameChecked).isTrue() // edited name, still checked → 1
+        vm.onAccount("32840110063875")
+        assertThat(vm.state.value.form.nameChecked).isFalse() // different account → check gone → 0
     }
 
     @Test fun `wrong recipient OTP keeps the sheet open with the message, never shows Saved`() = runTest {

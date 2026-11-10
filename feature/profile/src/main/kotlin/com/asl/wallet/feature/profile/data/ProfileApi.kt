@@ -7,9 +7,10 @@ import kotlinx.serialization.json.JsonPrimitive
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 
-/** Profile & settings endpoints (shapes checked on UAT and in asl-backend, 4 Nov 2026). Profile is read-only for now. */
+/** Profile & settings endpoints (shapes checked on UAT and in asl-backend, 4 and 9 Nov 2026). */
 interface ProfileApi {
     @GET("merchant/auth/me")
     suspend fun me(): Response<ApiEnvelope<ProfileDto>>
@@ -18,14 +19,32 @@ interface ProfileApi {
     suspend fun commission(): Response<ApiEnvelope<CommissionDto>>
 
     @GET("merchant/services")
-    suspend fun services(): Response<ApiEnvelope<List<ServiceStatusDto>>>
+    suspend fun services(): Response<ApiEnvelope<JsonElement>>
 
     @POST("merchant/auth/change-password/request-otp")
     suspend fun requestChangePasswordOtp(@Body body: ChangePasswordRequest): Response<ApiEnvelope<ChangePasswordOtpDto>>
 
     @POST("merchant/auth/change-password/verify-otp")
     suspend fun verifyChangePassword(@Body body: VerifyChangePasswordRequest): Response<ApiEnvelope<JsonElement>>
+
+    /** Returns the updated profile. Only the address and shop fields are ever sent (see [UpdateProfileRequest]). */
+    @PATCH("merchant/auth/profile")
+    suspend fun updateProfile(@Body body: UpdateProfileRequest): Response<ApiEnvelope<ProfileDto>>
 }
+
+/**
+ * The retailer may change only these (decided 9 Nov 2026). Name, mobile, email and PAN are identity and KYC data:
+ * the app never sends them here (the server would accept them without an OTP: reported to backend).
+ * No default values, so every field is always sent.
+ */
+@Serializable
+data class UpdateProfileRequest(
+    val company_name: String,
+    val addsdt: String,
+    val landmark: String,
+    val city: String,
+    val pincode: String,
+)
 
 /**
  * Only the fields the Profile screens show. The server sends much more (including the full Aadhaar and

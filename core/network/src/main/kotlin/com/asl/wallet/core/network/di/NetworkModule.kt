@@ -32,10 +32,18 @@ import javax.inject.Singleton
 /** Debug-only HTTP inspectors (Chucker in UAT debug). Empty in every other build. */
 @Qualifier @Retention(AnnotationRetention.BINARY) annotation class InspectorInterceptor
 
+/**
+ * UAT debug only: stand-in server answers for APIs the backend hasn't built yet (the Add Money / PayU demo).
+ * Added after the inspectors, so Chucker records the demo request and response exactly as the app sees them.
+ * Empty in every other build.
+ */
+@Qualifier @Retention(AnnotationRetention.BINARY) annotation class DemoInterceptor
+
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class InspectorDeclarations {
     @Multibinds @InspectorInterceptor abstract fun inspectors(): Set<Interceptor>
+    @Multibinds @DemoInterceptor abstract fun demos(): Set<Interceptor>
 }
 
 @Module
@@ -57,17 +65,25 @@ object NetworkModule {
         sessionEvents: SessionEvents,
         json: Json,
         @InspectorInterceptor inspectors: Set<@JvmSuppressWildcards Interceptor>,
+        @DemoInterceptor demos: Set<@JvmSuppressWildcards Interceptor>,
     ): OkHttpClient {
         val base = buildBaseClient(config)
         val refreshUrl = config.baseUrl.toHttpUrl().resolve("merchant/auth/refresh-token")!!
+        // The refresh call gets the same common headers as every other call, and (UAT debug) shows in Chucker,
+        // so a failed refresh can be seen. It has no Authorization and no authenticator, so it can't loop.
+        val refreshClient = base.newBuilder()
+            .addInterceptor(CommonHeadersInterceptor(config))
+            .apply { inspectors.forEach { addInterceptor(it) } }
+            .build()
         return base.newBuilder()
             .addInterceptor(StaleConnectionRetryInterceptor())
             .addInterceptor(CommonHeadersInterceptor(config))
             .addInterceptor(AuthInterceptor(tokenStore))
-            .authenticator(TokenAuthenticator(tokenStore, sessionEvents, json, base, refreshUrl))
+            .authenticator(TokenAuthenticator(tokenStore, sessionEvents, json, refreshClient, refreshUrl))
             .apply { if (config.isDebug) addInterceptor(debugLogger()) }
             // Last, so inspectors see the final request (headers are redacted by the inspector itself).
             .apply { inspectors.forEach { addInterceptor(it) } }
+            .apply { demos.forEach { addInterceptor(it) } }
             .build()
     }
 

@@ -24,10 +24,10 @@ interface DmtApi {
     @POST("merchant/dmt/add-remitter")
     suspend fun addRemitter(@Body body: AddRemitterRequest): Response<ApiEnvelope<JsonElement>>
 
-    @POST("merchant/dmt/generate-otp")
+    @POST("merchant/dmt/resend-otp")
     suspend fun generateOtp(@Body body: OtpRequest): Response<ApiEnvelope<JsonElement>>
 
-    @POST("merchant/dmt/verify-remitter")
+    @POST("merchant/dmt/verify-otp")
     suspend fun verifyOtp(@Body body: OtpRequest): Response<ApiEnvelope<JsonElement>>
 
     @POST("merchant/dmt/beneficiary-list")

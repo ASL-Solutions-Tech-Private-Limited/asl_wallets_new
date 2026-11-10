@@ -126,6 +126,8 @@ fun ReceiptCard(
     barcodeSeed: String? = null,
     animate: Boolean = false,
     thanks: String = "Thank you!",
+    /** Spoken after the stamp (instant receipts only), if the retailer has the voice on. */
+    voice: String? = null,
     actions: (@Composable () -> Unit)? = null,
 ) {
     val word = statusLabel ?: when (status) { Status.Success -> "Success"; Status.Pending -> "Pending"; Status.Failed -> "Failed"; else -> "" }
@@ -137,10 +139,23 @@ fun ReceiptCard(
     val stampAlpha = remember { Animatable(if (printed) 0.9f else 0f) }
     var feeding by remember { mutableStateOf(!printed) }
     val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
+    val sounds = remember { ReceiptSounds(context.applicationContext) }
+    val prefs = LocalReceiptSound.current
+    var spoken by rememberSaveable { mutableStateOf(false) }
+    fun announce() {
+        if (spoken || !animate || voice.isNullOrBlank() || !prefs.voice || !soundsAllowed(context)) return
+        spoken = true
+        ReceiptVoice.speak(context, if (prefs.voiceWithDateTime) ReceiptVoice.withDateTime(context, voice) else voice)
+    }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { sounds.release(); ReceiptVoice.stop() } }
 
     LaunchedEffect(Unit) {
-        if (printed) return@LaunchedEffect
+        // Animations off: no printing, but the announcement still comes (once).
+        if (printed) { announce(); return@LaunchedEffect }
         delay(250)
+        // The printer sound has six bursts timed to the six feed steps below (170 ms + 70 ms each).
+        if (prefs.printSound) sounds.play(com.asl.wallet.core.designsystem.R.raw.receipt_print)
         // Six short jerks, like paper out of a thermal printer.
         val steps = listOf(-0.86f, -0.72f, -0.54f, -0.36f, -0.16f, 0f)
         steps.forEach { target ->
@@ -151,10 +166,13 @@ fun ReceiptCard(
         feeding = false
         delay(120)
         launch { stampAlpha.animateTo(0.9f, tween(160)) }
+        if (prefs.printSound) sounds.play(com.asl.wallet.core.designsystem.R.raw.receipt_stamp, volume = 0.9f)
         stampScale.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 500f))
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         delay(120)
         printed = true
+        delay(250)
+        announce()
     }
 
     Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -173,6 +191,35 @@ fun ReceiptCard(
             }
         }
         if (actions != null) AnimatedVisibility(printed, enter = fadeIn(tween(250)) + slideInVertically(tween(300)) { it / 2 }) { actions() }
+    }
+}
+
+/**
+ * The receipt's printer and stamp sounds. Quiet when the phone is on silent or vibrate; each sound is released as soon
+ * as it ends, and anything still playing stops when the receipt leaves the screen.
+ */
+private class ReceiptSounds(private val context: android.content.Context) {
+    private val playing = mutableListOf<android.media.MediaPlayer>()
+
+    private fun allowed(): Boolean = runCatching {
+        (context.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager).ringerMode == android.media.AudioManager.RINGER_MODE_NORMAL
+    }.getOrDefault(false)
+
+    fun play(res: Int, volume: Float = 0.55f) {
+        if (!allowed()) return
+        runCatching {
+            android.media.MediaPlayer.create(context, res)?.apply {
+                setVolume(volume, volume)
+                setOnCompletionListener { mp -> synchronized(playing) { playing.remove(mp) }; mp.release() }
+                synchronized(playing) { playing += this }
+                start()
+            }
+        }
+    }
+
+    fun release() = synchronized(playing) {
+        playing.forEach { runCatching { it.stop(); it.release() } }
+        playing.clear()
     }
 }
 
@@ -224,16 +271,24 @@ private fun Slip(
             // service and amount
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(title.uppercase(), color = Paper.soft, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.5.sp, textAlign = TextAlign.Center)
-                Text(amount, color = Paper.ink, fontFamily = Mono, fontSize = 28.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(vertical = 2.dp))
+                Text(amount, color = Paper.ink, fontFamily = com.asl.wallet.core.designsystem.theme.Gilroy, fontSize = 30.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(vertical = 2.dp))
                 if (!words.isNullOrBlank()) Text(words, color = Paper.soft, fontSize = 10.5.sp, textAlign = TextAlign.Center)
             }
             TearLine()
-            // rows: label left, value right in printer type
-            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                rows.forEach { r ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(r.key, color = Paper.soft, fontSize = 11.5.sp, modifier = Modifier.weight(0.67f, fill = false))
-                        Text(r.value, color = Paper.ink, fontFamily = Mono, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.End, modifier = Modifier.weight(1f))
+            // rows: label in a fixed left column, value right-aligned to the edge, on the same baseline;
+            // a faint dotted rule between rows keeps each label with its value.
+            Column {
+                rows.forEachIndexed { i, r ->
+                    if (i > 0) DotRule()
+                    Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            r.key, color = Paper.soft, fontSize = 12.5.sp, lineHeight = 17.sp, fontWeight = FontWeight.Medium,
+                            modifier = Modifier.weight(0.42f).alignByBaseline(),
+                        )
+                        Text(
+                            r.value, color = Paper.ink, fontSize = 13.5.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End,
+                            modifier = Modifier.weight(0.58f).alignByBaseline(),
+                        )
                     }
                 }
             }
@@ -247,6 +302,13 @@ private fun Slip(
             modifier = Modifier.align(Alignment.TopEnd).offset(x = (-10).dp, y = 22.dp).alpha(stampAlpha).scale(stampScale).rotate(-12f)
                 .border(2.dp, stampColor.copy(alpha = 0.85f), RoundedCornerShape(7.dp)).padding(horizontal = 8.dp, vertical = 2.dp),
         )
+    }
+}
+
+@Composable
+private fun DotRule() {
+    Canvas(Modifier.fillMaxWidth().height(1.dp)) {
+        drawLine(Paper.tear.copy(alpha = 0.6f), Offset(0f, 0f), Offset(size.width, 0f), 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 3.dp.toPx())))
     }
 }
 

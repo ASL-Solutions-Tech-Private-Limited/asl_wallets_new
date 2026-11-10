@@ -82,13 +82,17 @@ class CommissionViewModel @Inject constructor(private val repo: ProfileRepositor
 
 @HiltViewModel
 class ActiveServicesViewModel @Inject constructor(private val repo: ProfileRepository) : ViewModel() {
-    private val _state = MutableStateFlow<Loadable<List<ActiveService>>>(Loadable.Loading)
-    val state: StateFlow<Loadable<List<ActiveService>>> = _state.asStateFlow()
+    private val _state = MutableStateFlow<Loadable<List<com.asl.wallet.feature.profile.domain.ServiceEntry>>>(Loadable.Loading)
+    val state: StateFlow<Loadable<List<com.asl.wallet.feature.profile.domain.ServiceEntry>>> = _state.asStateFlow()
 
     init { load() }
     fun load() {
         _state.value = Loadable.Loading
-        viewModelScope.launch { _state.value = repo.activeServices().toLoadable() }
+        viewModelScope.launch {
+            _state.value = repo.activeServices().toLoadable().let { l ->
+                if (l is Loadable.Ready) Loadable.Ready(com.asl.wallet.feature.profile.domain.ServiceStatus.entries(l.data)) else l as Loadable<Nothing>
+            }
+        }
     }
 }
 

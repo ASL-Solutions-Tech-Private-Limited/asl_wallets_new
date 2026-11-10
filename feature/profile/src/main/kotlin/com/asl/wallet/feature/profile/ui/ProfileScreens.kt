@@ -1,5 +1,22 @@
 package com.asl.wallet.feature.profile.ui
 
+import com.asl.wallet.core.designsystem.R as DS
+import androidx.compose.ui.graphics.graphicsLayer
+import com.asl.wallet.core.designsystem.component.pressScale
+import com.asl.wallet.core.designsystem.component.WaveBand
+import com.asl.wallet.core.designsystem.component.ServiceArtView
+import com.asl.wallet.core.designsystem.component.ServiceArt
+import com.asl.wallet.feature.profile.domain.ServiceState
+import com.asl.wallet.feature.profile.domain.ServiceEntry
+import com.asl.wallet.feature.profile.domain.AppService
+import com.asl.wallet.core.designsystem.component.keyboardAware
+import androidx.compose.foundation.layout.imePadding
+import com.asl.wallet.core.designsystem.component.shimmer
+import com.asl.wallet.core.designsystem.component.popIn
+import com.asl.wallet.core.designsystem.component.headerBackground
+import com.asl.wallet.core.designsystem.component.StatusBarTone
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.border
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -32,6 +49,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -102,7 +120,7 @@ import com.asl.wallet.feature.profile.domain.SupportResult
 @Composable
 private fun Screen(title: String, onBack: () -> Unit, close: Boolean = false, bottom: (@Composable ColumnScope.() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
     val c = AslTheme.colors
-    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding()) {
+    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding().keyboardAware()) {
         AslTopBar(title, onBack = onBack, closeIcon = close)
         Column(
             Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 20.dp).then(if (bottom == null) Modifier.navigationBarsPadding() else Modifier),
@@ -166,27 +184,40 @@ fun ProfileTab(
     val c = AslTheme.colors
     val state by vm.state.collectAsStateWithLifecycle()
     var confirm by remember { mutableStateOf(false) }
-    Column(
-        Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(stringResource(R.string.pf_title), style = AslTheme.type.headline, color = c.textPrimary, modifier = Modifier.semantics { heading() })
-        when (val s = state) {
-            Loadable.Loading -> LoadingList()
-            is Loadable.Failed -> AslCard { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    // Classic look: the old app's profile header (navy → blue, rounded bottom) with the avatar, name and shop.
+    StatusBarTone.OnDarkHeader()
+    Column(Modifier.fillMaxSize().background(c.background).verticalScroll(rememberScrollState())) {
+        Column(
+            Modifier.fillMaxWidth().headerBackground(c.headerGradient, corner = 20.dp).statusBarsPadding().padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(stringResource(R.string.pf_title), style = AslTheme.type.title, color = Color.White, modifier = Modifier.fillMaxWidth().semantics { heading() })
+            when (val s = state) {
+                Loadable.Loading -> Box(Modifier.size(64.dp).clip(CircleShape).shimmer())
+                is Loadable.Failed -> Unit
+                is Loadable.Ready -> {
+                    Box(
+                        Modifier.popIn(80).size(68.dp).clip(CircleShape).background(Color.White).border(2.dp, Color.White.copy(alpha = 0.6f), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) { Text(s.data.initials, style = AslTheme.type.title, color = c.brandNavy) }
+                    Text(s.data.name.uppercase(), style = AslTheme.type.bodyStrong, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        listOfNotNull(s.data.shopName.ifBlank { null }, s.data.regno?.let { "R-$it" }).joinToString(" · "),
+                        style = AslTheme.type.caption, color = Color.White.copy(alpha = 0.8f), textAlign = TextAlign.Center,
+                    )
+                    Text(
+                        stringResource(if (isDistributor) R.string.pf_distributor else R.string.pf_retailer), style = AslTheme.type.micro, color = Color.White,
+                        modifier = Modifier.background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 3.dp),
+                    )
+                }
+            }
+        }
+    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        (state as? Loadable.Failed)?.let { s ->
+            AslCard { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 AlertBanner(AlertKind.Error, errorText(s.error), icon = AslIcons.WifiOff)
                 AslButton(stringResource(R.string.pf_retry), vm::load, style = AslButtonStyle.Outline, compact = true, icon = AslIcons.Refresh)
             } }
-            is Loadable.Ready -> AslCard {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Avatar(s.data.initials)
-                    Column(Modifier.weight(1f)) {
-                        Text(s.data.name, style = AslTheme.type.bodyStrong, color = c.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(listOfNotNull(s.data.shopName.ifBlank { null }, s.data.regno?.let { "R-$it" }).joinToString(" · "), style = AslTheme.type.caption, color = c.textSecondary)
-                    }
-                    StatusPill(stringResource(if (isDistributor) R.string.pf_distributor else R.string.pf_retailer), Status.Info)
-                }
-            }
         }
         aepsRow?.invoke()
         SectionHeader(stringResource(R.string.pf_sec_account))
@@ -205,6 +236,7 @@ fun ProfileTab(
         extra?.invoke()
         AslButton(stringResource(R.string.pf_logout), { confirm = true }, Modifier.fillMaxWidth(), style = AslButtonStyle.Danger)
         Text(stringResource(R.string.pf_version, versionName), style = AslTheme.type.caption, color = c.textSecondary, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+    }
     }
     if (confirm) {
         AlertDialog(
@@ -283,24 +315,133 @@ fun CommissionScreen(onBack: () -> Unit, vm: CommissionViewModel = hiltViewModel
 
 // ---------------------------------------------------------------- 3.4 Active services
 
+/**
+ * All the app's services with this retailer's status. Active → opens it ([onOpen]); Not active → contact support;
+ * Coming soon → not in the app yet.
+ */
 @Composable
-fun ActiveServicesScreen(onBack: () -> Unit, vm: ActiveServicesViewModel = hiltViewModel()) {
+fun ActiveServicesScreen(
+    onBack: () -> Unit,
+    onOpen: (AppService) -> Unit = {},
+    onCall: () -> Unit = {},
+    onWhatsApp: () -> Unit = {},
+    vm: ActiveServicesViewModel = hiltViewModel(),
+) {
     val state by vm.state.collectAsStateWithLifecycle()
+    var ask by remember { mutableStateOf<ServiceEntry?>(null) }
     Screen(stringResource(R.string.pf_services), onBack) {
         when (val s = state) {
             Loadable.Loading -> LoadingList()
             is Loadable.Failed -> FailedState(s.error, vm::load)
             is Loadable.Ready -> {
-                ListCard {
-                    s.data.forEachIndexed { i, svc ->
-                        if (i > 0) Divider()
-                        ListRow(svc.name, subtitle = svc.description, icon = AslIcons.Check, trailing = {
-                            StatusPill(stringResource(if (svc.active) R.string.pf_active else R.string.pf_off), if (svc.active) Status.Success else Status.Failed)
-                        })
+                ServicesSummary(s.data)
+                listOf(true to R.string.pf_svc_banking, false to R.string.pf_svc_bills).forEach { (banking, title) ->
+                    val group = s.data.filter { it.service.banking == banking }
+                    if (group.isNotEmpty()) {
+                        SectionHeader(stringResource(title))
+                        group.forEachIndexed { i, e ->
+                            ServiceRow(e, Modifier.popIn(80 + i * 50, rise = 12.dp)) { if (e.state == ServiceState.Active) onOpen(e.service) else ask = e }
+                        }
                     }
                 }
-                AlertBanner(AlertKind.Info, stringResource(R.string.pf_services_help), message = stringResource(R.string.pf_services_help_msg), icon = AslIcons.Help)
             }
+        }
+    }
+    ask?.let { e ->
+        val c = AslTheme.colors
+        AlertDialog(
+            onDismissRequest = { ask = null },
+            containerColor = c.surface,
+            title = { Text(stringResource(if (e.state == ServiceState.ComingSoon) R.string.pf_svc_soon_title else R.string.pf_svc_off_title, serviceName(e.service)), style = AslTheme.type.title, color = c.textPrimary) },
+            text = { Text(stringResource(if (e.state == ServiceState.ComingSoon) R.string.pf_svc_soon_msg else R.string.pf_svc_off_msg), style = AslTheme.type.body, color = c.textSecondary) },
+            confirmButton = {
+                if (e.state == ServiceState.NotActive) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AslButton(stringResource(R.string.pf_svc_whatsapp), { ask = null; onWhatsApp() }, style = AslButtonStyle.Outline, compact = true, icon = AslIcons.Chat)
+                    AslButton(stringResource(R.string.pf_svc_call), { ask = null; onCall() }, compact = true, icon = AslIcons.Phone)
+                } else AslButton(stringResource(R.string.pf_svc_ok), { ask = null }, compact = true)
+            },
+            dismissButton = { if (e.state == ServiceState.NotActive) TextButton({ ask = null }) { Text(stringResource(R.string.pf_cancel)) } },
+        )
+    }
+}
+
+@Composable
+private fun serviceName(s: AppService) = stringResource(when (s) {
+    AppService.Aeps -> R.string.pf_svc_aeps; AppService.MoneyTransfer -> R.string.pf_svc_dmt; AppService.Payout -> R.string.pf_svc_payout
+    AppService.MicroAtm -> R.string.pf_svc_matm; AppService.UpiTransfer -> R.string.pf_svc_upi; AppService.CardToCash -> R.string.pf_svc_c2c
+    AppService.AadhaarPay -> R.string.pf_svc_aadhaar_pay; AppService.MobileRecharge -> R.string.pf_svc_mobile; AppService.DthRecharge -> R.string.pf_svc_dth
+    AppService.BillPayment -> R.string.pf_svc_bbps; AppService.Pan -> R.string.pf_svc_pan
+})
+
+@Composable
+private fun serviceDesc(s: AppService) = stringResource(when (s) {
+    AppService.Aeps -> R.string.pf_svc_aeps_d; AppService.MoneyTransfer -> R.string.pf_svc_dmt_d; AppService.Payout -> R.string.pf_svc_payout_d
+    AppService.MicroAtm -> R.string.pf_svc_matm_d; AppService.UpiTransfer -> R.string.pf_svc_upi_d; AppService.CardToCash -> R.string.pf_svc_c2c_d
+    AppService.AadhaarPay -> R.string.pf_svc_aadhaar_pay_d; AppService.MobileRecharge -> R.string.pf_svc_mobile_d; AppService.DthRecharge -> R.string.pf_svc_dth_d
+    AppService.BillPayment -> R.string.pf_svc_bbps_d; AppService.Pan -> R.string.pf_svc_pan_d
+})
+
+private fun artOf(s: AppService): ServiceArt = when (s) {
+    AppService.Aeps -> ServiceArt.Lottie(DS.raw.classic_lottie_biometric)
+    AppService.MoneyTransfer -> ServiceArt.Lottie(DS.raw.classic_lottie_dmt)
+    AppService.Payout -> ServiceArt.Lottie(DS.raw.classic_lottie_transaction_process)
+    AppService.MicroAtm -> ServiceArt.Lottie(DS.raw.classic_lottie_ic_matm)
+    AppService.UpiTransfer -> ServiceArt.Lottie(DS.raw.classic_lottie_ic_payout_upi_a)
+    AppService.CardToCash -> ServiceArt.Lottie(DS.raw.classic_lottie_cashtocard)
+    AppService.AadhaarPay -> ServiceArt.Picture(DS.drawable.classic_ic_aadhaar_pay)
+    AppService.MobileRecharge -> ServiceArt.Picture(DS.drawable.classic_ic_mob_recharge)
+    AppService.DthRecharge -> ServiceArt.Picture(DS.drawable.classic_ic_dth)
+    AppService.BillPayment -> ServiceArt.Picture(DS.drawable.classic_ic_electricity)
+    AppService.Pan -> ServiceArt.Picture(DS.drawable.classic_ic_new_pan_a)
+}
+
+/** "4 of 11 services active" on the brand gradient, with a bar that fills in. */
+@Composable
+private fun ServicesSummary(all: List<ServiceEntry>) {
+    val on = all.count { it.state == ServiceState.Active }
+    val fill by androidx.compose.animation.core.animateFloatAsState(
+        if (all.isEmpty()) 0f else on.toFloat() / all.size, androidx.compose.animation.core.tween(900, delayMillis = 150), label = "svcFill",
+    )
+    val shape = RoundedCornerShape(topStart = 6.dp, topEnd = 26.dp, bottomEnd = 6.dp, bottomStart = 26.dp)
+    Box(Modifier.fillMaxWidth().popIn(0, rise = 14.dp).clip(shape).background(Brush.linearGradient(AslTheme.colors.headerGradient))) {
+        WaveBand(Modifier.matchParentSize())
+        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.pf_svc_summary, on, all.size), style = AslTheme.type.title, color = Color.White)
+            Text(stringResource(R.string.pf_svc_summary_sub), style = AslTheme.type.caption, color = Color.White.copy(alpha = 0.85f))
+            Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.2f))) {
+                Box(Modifier.fillMaxWidth(fill).height(8.dp).clip(RoundedCornerShape(50)).background(Color(0xFF7CE0A3)))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ServiceRow(e: ServiceEntry, modifier: Modifier, onClick: () -> Unit) {
+    val c = AslTheme.colors
+    val active = e.state == ServiceState.Active
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val shape = RoundedCornerShape(16.dp)
+    Row(
+        modifier.fillMaxWidth().pressScale(interaction, 0.97f).clip(shape).background(c.surface).border(1.dp, c.outline, shape)
+            .clickable(interaction, indication = androidx.compose.material3.ripple(), role = Role.Button, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        // Not-active services look faded so the active ones stand out.
+        Box(Modifier.size(50.dp).clip(RoundedCornerShape(14.dp)).background(c.tint).graphicsLayer { alpha = if (active) 1f else 0.45f }, contentAlignment = Alignment.Center) {
+            ServiceArtView(artOf(e.service), c.primary, Modifier.size(36.dp))
+        }
+        Column(Modifier.weight(1f)) {
+            Text(serviceName(e.service), style = AslTheme.type.bodyStrong, color = if (active) c.textPrimary else c.textSecondary)
+            Text(serviceDesc(e.service), style = AslTheme.type.caption, color = c.textSecondary, maxLines = 2)
+        }
+        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            when (e.state) {
+                ServiceState.Active -> StatusPill(stringResource(R.string.pf_active), Status.Success)
+                ServiceState.NotActive -> StatusPill(stringResource(R.string.pf_svc_not_active), Status.Failed)
+                ServiceState.ComingSoon -> StatusPill(stringResource(R.string.pf_svc_soon), Status.Pending)
+            }
+            Icon(if (active) AslIcons.Chevron else if (e.state == ServiceState.NotActive) AslIcons.Lock else AslIcons.Clock, null, tint = c.textSecondary, modifier = Modifier.size(16.dp))
         }
     }
 }
@@ -313,7 +454,7 @@ fun ChangePasswordScreen(onDone: () -> Unit, onBack: () -> Unit, vm: ChangePassw
     val c = AslTheme.colors
     SecureScreen()
     when (s.step) {
-        ChangeStep.Done -> Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding().navigationBarsPadding().padding(16.dp)) {
+        ChangeStep.Done -> Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding().keyboardAware().navigationBarsPadding().padding(16.dp)) {
             Spacer(Modifier.weight(1f))
             StateView(AslIcons.Check, StatePresets.okColors, stringResource(R.string.pf_pw_done), stringResource(R.string.pf_pw_done_msg)) {
                 AslPrimaryButton(stringResource(R.string.pf_done), onDone)
@@ -375,7 +516,12 @@ private fun StrengthCard(s: ChangePasswordState) {
 // ---------------------------------------------------------------- 3.7 Settings
 
 @Composable
-fun SettingsScreen(themeMode: ThemeMode, onTheme: (ThemeMode) -> Unit, versionName: String, onBack: () -> Unit) {
+fun SettingsScreen(
+    themeMode: ThemeMode, onTheme: (ThemeMode) -> Unit, versionName: String, onBack: () -> Unit, onArrangeHome: (() -> Unit)? = null,
+    sound: com.asl.wallet.core.designsystem.component.ReceiptSound = com.asl.wallet.core.designsystem.component.ReceiptSound(),
+    onSound: (com.asl.wallet.core.designsystem.component.ReceiptSound) -> Unit = {},
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val langs = listOf("en" to "English", "hi" to "हिन्दी", "bn" to "বাংলা")
     val current = AppCompatDelegate.getApplicationLocales().toLanguageTags().take(2).ifEmpty { "en" }
     Screen(stringResource(R.string.pf_settings), onBack) {
@@ -388,6 +534,33 @@ fun SettingsScreen(themeMode: ThemeMode, onTheme: (ThemeMode) -> Unit, versionNa
             listOf(stringResource(R.string.pf_theme_light), stringResource(R.string.pf_theme_dark), stringResource(R.string.pf_theme_system)),
             ThemeMode.entries.indexOf(themeMode), { onTheme(ThemeMode.entries[it]) },
         )
+        if (onArrangeHome != null) {
+            SectionHeader(stringResource(R.string.pf_home_layout))
+            ListCard { ListRow(stringResource(R.string.pf_arrange_home), subtitle = stringResource(R.string.pf_arrange_home_sub), icon = AslIcons.Arrange, onClick = onArrangeHome) }
+        }
+        SectionHeader(stringResource(R.string.pf_sounds))
+        ListCard {
+            ListRow(stringResource(R.string.pf_sound_print), subtitle = stringResource(R.string.pf_sound_print_sub), icon = AslIcons.Print,
+                trailing = { androidx.compose.material3.Switch(sound.printSound, { onSound(sound.copy(printSound = it)) }) }, onClick = { onSound(sound.copy(printSound = !sound.printSound)) })
+            Divider()
+            ListRow(stringResource(R.string.pf_sound_voice), subtitle = stringResource(R.string.pf_sound_voice_sub), icon = AslIcons.Chat,
+                trailing = { androidx.compose.material3.Switch(sound.voice, { onSound(sound.copy(voice = it)) }) }, onClick = { onSound(sound.copy(voice = !sound.voice)) })
+        }
+        androidx.compose.animation.AnimatedVisibility(sound.voice) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.pf_sound_speak), style = AslTheme.type.label, color = AslTheme.colors.textSecondary)
+                SegmentedControl(
+                    listOf(stringResource(R.string.pf_sound_amount_only), stringResource(R.string.pf_sound_date_time)),
+                    if (sound.voiceWithDateTime) 1 else 0, { onSound(sound.copy(voiceWithDateTime = it == 1)) },
+                )
+                val sample = stringResource(R.string.pf_sound_sample)
+                AslButton(stringResource(R.string.pf_sound_try), {
+                    com.asl.wallet.core.designsystem.component.ReceiptVoice.speak(context,
+                        if (sound.voiceWithDateTime) com.asl.wallet.core.designsystem.component.ReceiptVoice.withDateTime(context, sample) else sample)
+                }, Modifier.fillMaxWidth(), style = AslButtonStyle.Outline, icon = AslIcons.Chat, compact = true)
+            }
+        }
+        Text(stringResource(R.string.pf_sound_note), style = AslTheme.type.caption, color = AslTheme.colors.textSecondary)
         SectionHeader(stringResource(R.string.pf_sec))
         // App lock is mandatory in this app (money app; set up at first sign-in), so it is shown, not toggled.
         ListCard {
@@ -452,7 +625,7 @@ private fun ApiNotReadySheet(title: String, contacts: SupportContacts, onDismiss
     val context = LocalContext.current
     val noApp = stringResource(R.string.pf_no_app)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = AslTheme.colors.surface, shape = AslShapes.sheet) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp).padding(bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.fillMaxWidth().imePadding().navigationBarsPadding().padding(horizontal = 20.dp).padding(bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             BigIcon(AslIcons.Clock, AslGradients.action, Modifier.align(Alignment.CenterHorizontally))
             Text(title, style = AslTheme.type.title, color = AslTheme.colors.textPrimary, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
             Text(stringResource(R.string.pf_api_soon_msg), style = AslTheme.type.body, color = AslTheme.colors.textSecondary, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())

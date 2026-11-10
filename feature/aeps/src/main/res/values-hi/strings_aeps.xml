@@ -182,4 +182,30 @@
     <string name="ae_receipt_share_title">AEPS रसीद</string>
     <string name="ae_setup_row">AEPS सेट-अप</string>
     <string name="ae_due_count">%1$d बाकी</string>
+    <!-- Receipt stamp words (bill for every outcome) -->
+    <string name="ae_s_pending">पेंडिंग</string>
+    <string name="ae_s_failed">फ़ेल</string>
+    <string name="ae_reason">कारण</string>
+    <!-- Transaction form (10 Nov 2026) -->
+    <string name="ae_step_fill">जानकारी</string>
+    <string name="ae_step_scan">फ़िंगर स्कैन</string>
+    <string name="ae_step_receipt">रसीद</string>
+    <string name="ae_ask_withdraw">ग्राहक को कितना नकद चाहिए?</string>
+    <string name="ae_ask_deposit">ग्राहक कितना नकद जमा कर रहा है?</string>
+    <string name="ae_pick_bank">ग्राहक का बैंक चुनें</string>
+    <string name="ae_pick_bank_sub">आधार से जुड़ा बैंक</string>
+    <string name="ae_bank_of_customer">ग्राहक का बैंक (आधार से जुड़ा)</string>
+    <string name="ae_choose_btn">चुनें</string>
+    <!-- Aadhaar consent (10 Nov 2026) -->
+    <string name="ae_consent">मैंने आधार सहमति पढ़ ली है और ग्राहक सहमत है</string>
+    <string name="ae_consent_read">पढ़ें</string>
+    <string name="ae_consent_title">आधार सहमति</string>
+    <string name="ae_consent_text">मैं, ग्राहक, बैंक और ASL को अपना आधार नंबर और फ़िंगरप्रिंट (या चेहरा) केवल UIDAI से मेरी पहचान जाँचने और यह AePS लेनदेन पूरा करने के लिए इस्तेमाल करने की सहमति देता/देती हूँ। मैं समझता/समझती हूँ कि मेरा बायोमेट्रिक डेटा सेव नहीं किया जाता, रसीद पर आधार नंबर छिपा कर ही दिखाया जाता है, और मैं इसे देने से मना कर सकता/सकती हूँ।</string>
+    <string name="ae_consent_ok">ग्राहक सहमत है</string>
+    <!-- Voice after the receipt -->
+    <string name="ae_voice_withdraw">नकद निकासी सफल। %1$s रुपये निकाले गए।</string>
+    <string name="ae_voice_deposit">नकद जमा सफल। %1$s रुपये जमा किए गए।</string>
+    <string name="ae_voice_balance_done">बैलेंस जाँच सफल।</string>
+    <string name="ae_voice_statement">मिनी स्टेटमेंट तैयार है।</string>
+    <string name="ae_voice_available">उपलब्ध बैलेंस %1$s रुपये।</string>
 </resources>

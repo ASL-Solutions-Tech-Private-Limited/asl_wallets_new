@@ -9,7 +9,8 @@ enum class AepsProvider(val id: Int, val displayName: String) {
     /** FingPay. Fully implemented on the new backend. */
     Kotak(2, "Kotak Bank");
 
-    val supportsDeposit: Boolean get() = this == YesBank
+    /** Cash deposit is offered on both banks (user, 10 Nov 2026); the server answers if a bank can't take it. */
+    val supportsDeposit: Boolean get() = true
     val needsBankVerification: Boolean get() = this == Kotak
     val needsBiometricKyc: Boolean get() = this == YesBank
 

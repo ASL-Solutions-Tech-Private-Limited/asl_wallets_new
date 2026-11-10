@@ -59,7 +59,7 @@
     <string name="d_check_name">ব্যাংকে নাম যাচাই · %1$s</string>
     <string name="d_checking_name">ব্যাংকে যাচাই হচ্ছে</string>
     <string name="d_name_differs">ব্যাংকে নাম আলাদা</string>
-    <string name="d_name_differs_msg">আপনি লিখেছেন: %1$s · ব্যাংকে: %2$s। গ্রাহককে জিজ্ঞেস করুন অ্যাকাউন্ট ঠিক কিনা।</string>
+    <string name="d_name_differs_msg" formatted="true">আপনি \"%1$s\" লিখেছিলেন। উপরে ব্যাংকের নাম বসানো হয়েছে। গ্রাহককে জিজ্ঞেস করুন অ্যাকাউন্ট ঠিক কিনা।</string>
     <string name="d_use_bank_name">ব্যাংকের নাম ব্যবহার করুন</string>
     <string name="d_bank_says">ব্যাংকে: %1$s</string>
     <string name="d_account_active">অ্যাকাউন্টটি আছে এবং চালু।</string>
@@ -146,4 +146,9 @@
     <string name="d_offline">ইন্টারনেট নেই। সংযোগ দেখে আবার চেষ্টা করুন।</string>
     <string name="d_timeout">সার্ভার অনেক সময় নিয়েছে। আবার চেষ্টা করুন।</string>
     <string name="d_generic">কিছু ভুল হয়েছে। আবার চেষ্টা করুন।</string>
+    <!-- Receipt stamp words (bill for every outcome) -->
+    <string name="d_pending">পেন্ডিং</string>
+    <string name="d_failed">ব্যর্থ</string>
+    <!-- Voice after the receipt -->
+    <string name="d_voice">%1$s টাকার মানি ট্রান্সফার সফল।</string>
 </resources>

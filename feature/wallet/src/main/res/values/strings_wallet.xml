@@ -221,4 +221,49 @@
         <item quantity="one">%d request</item>
         <item quantity="other">%d requests</item>
     </plurals>
+    <!-- Add Money (classic, animated) -->
+    <string name="w_am_current">Current wallet balance</string>
+    <string name="w_am_after">After top-up</string>
+    <string name="w_am_ask">How much do you want to add?</string>
+    <string name="w_am_quick">Quick add</string>
+    <string name="w_am_min">Min %1$s</string>
+    <string name="w_am_max">Max %1$s</string>
+    <string name="w_am_secured">Secured by PayU</string>
+    <string name="w_am_upi">UPI</string>
+    <string name="w_am_cards">Cards</string>
+    <string name="w_am_netbanking">Net banking</string>
+    <string name="w_am_amount_desc">Amount to add, in rupees</string>
+    <!-- Receipt stamp words (bill for every outcome) -->
+    <string name="w_failed">Failed</string>
+    <!-- Payout needs the shop location -->
+    <string name="w_loc_title">Location needed</string>
+    <string name="w_loc_permission">Payouts are sent with your shop\'s location. Allow location to continue.</string>
+    <string name="w_loc_turn_on">Turn on location (GPS) on your phone, then tap Continue again.</string>
+    <string name="w_loc_nofix_title">Couldn\'t find your location</string>
+    <string name="w_loc_nofix">Nothing was sent. Move near a window or outside, then confirm again.</string>
+    <string name="w_loc_allow">Allow location</string>
+    <string name="w_loc_settings">Open settings</string>
+    <string name="w_loc_ok">OK</string>
+    <!-- Payout form (10 Nov 2026) -->
+    <string name="w_po_balance">Wallet balance</string>
+    <string name="w_po_after">After payout</string>
+    <string name="w_po_send_to">Send to</string>
+    <string name="w_po_choose_sub">Your own verified bank account</string>
+    <string name="w_po_ask">How much do you want to send to your bank?</string>
+    <string name="w_po_quick">Quick amount</string>
+    <string name="w_po_mode">Transfer mode</string>
+    <string name="w_po_imps_sub">Instant · 24×7</string>
+    <string name="w_po_neft_sub">Within 2 hours · bank hours</string>
+    <string name="w_po_limits">%1$s to %2$s per payout · charges as per your plan</string>
+    <string name="w_po_ac_no">Account number</string>
+    <string name="w_po_ifsc">IFSC</string>
+    <string name="w_po_own">Own account</string>
+    <string name="w_po_relative">Relative\'s account</string>
+    <string name="w_po_verified">Verified</string>
+    <string name="w_po_change">Change</string>
+    <string name="w_po_waiting">Waiting for verification</string>
+    <string name="w_po_waiting_note">Banks waiting for verification can\'t receive payouts yet. ASL checks them; this usually takes a few hours.</string>
+    <string name="w_po_none_verified">No verified bank yet</string>
+    <!-- Voice after the receipt -->
+    <string name="w_voice">Payout of %1$s rupees sent to your bank.</string>
 </resources>

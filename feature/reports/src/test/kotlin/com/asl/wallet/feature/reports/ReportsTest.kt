@@ -239,7 +239,7 @@ class ReadersTest {
     @Test fun `report tiles follow the retailer's services, send to bank always`() {
         val k = kindsFromServices(listOf(obj("""{"services_name":"AEPS","status":1}"""), obj("""{"services_name":"Mobile Recharge","status":"1"}"""),
             obj("""{"services_name":"PAN Card","status":0}"""), obj("""{"services_name":"Money Transfer"}""")))
-        assertThat(k).containsExactly(ReportKind.Aeps, ReportKind.Recharge, ReportKind.Dmt, ReportKind.Payout)
+        assertThat(k).containsExactly(ReportKind.Aeps, ReportKind.Recharge, ReportKind.Dmt, ReportKind.Payout, ReportKind.AddMoney)
     }
 }
 
@@ -451,5 +451,27 @@ class ReportsViewModelTest {
         vm.setType(LedgerType.MoneyIn)
         assertThat(vm.list.value.items).hasSize(1)
         assertThat(vm.list.value.ledgerType).isEqualTo(LedgerType.MoneyIn)
+    }
+}
+
+class AddMoneyReportTest {
+    private fun obj(s: String) = kotlinx.serialization.json.Json.parseToJsonElement(s) as kotlinx.serialization.json.JsonObject
+
+    @org.junit.Test fun `add money rows - the UAT shape, PayU, pending and failed with a reason`() {
+        val ok = com.asl.wallet.feature.reports.data.readRow(com.asl.wallet.feature.reports.domain.ReportKind.AddMoney, obj(
+            """{"index":3,"id":"27816","clientTxnId":"PAYU6044_1762768843000","amount":1,"orderId":"ASL6044T1762768843000","customerEmail":"x@y.z","customerMobile":"9798143077",
+               "apiTag":"PAYU","pInfo":"Ajay","isPaymentComp":"ONE","status":"SUCCESS","inDate":"10/11/2026","inTime":"3:30:43 pm"}"""))!!
+        com.google.common.truth.Truth.assertThat(ok.status).isEqualTo(com.asl.wallet.feature.reports.domain.RowStatus.Success)
+        com.google.common.truth.Truth.assertThat(ok.txnId).isEqualTo("PAYU6044_1762768843000")
+        com.google.common.truth.Truth.assertThat(ok.amount).isEqualTo(java.math.BigDecimal.ONE)
+        com.google.common.truth.Truth.assertThat(ok.day).isEqualTo(com.asl.wallet.feature.reports.domain.Day(2026, 11, 10))
+        com.google.common.truth.Truth.assertThat(ok.time).isEqualTo("3:30 PM")
+        com.google.common.truth.Truth.assertThat(ok.fields.map { it.second }).doesNotContain("9798143077") // customer details never read
+        val failed = com.asl.wallet.feature.reports.data.readRow(com.asl.wallet.feature.reports.domain.ReportKind.AddMoney, obj(
+            """{"id":"1","clientTxnId":"PAYU6044_1","amount":500,"status":"FAILED","pInfo":"FAILED: Bank declined","inDate":"09/11/2026","inTime":"1:00:00 pm"}"""))!!
+        com.google.common.truth.Truth.assertThat(failed.fields.toMap()[com.asl.wallet.feature.reports.domain.Field.Reason]).isEqualTo("Bank declined")
+        val pending = com.asl.wallet.feature.reports.data.readRow(com.asl.wallet.feature.reports.domain.ReportKind.AddMoney, obj(
+            """{"id":"2","clientTxnId":"PAYU6044_2","amount":1,"status":"PENDING","pInfo":"FAILED: No Error"}"""))!!
+        com.google.common.truth.Truth.assertThat(pending.status).isEqualTo(com.asl.wallet.feature.reports.domain.RowStatus.Pending)
     }
 }

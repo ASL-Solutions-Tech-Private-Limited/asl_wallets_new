@@ -24,16 +24,16 @@ sealed interface CaptureResult {
 }
 
 object RdServices {
-    fun captureIntent(device: RdDevice, wadh: String?, otp: String? = null): Intent {
+    fun captureIntent(device: RdDevice, wadh: String?, otp: String? = null, selfPackage: String? = null): Intent {
         val options = if (device.isFace) Pid.faceOptions(txnId(), wadh.orEmpty(), otp.orEmpty()) else Pid.fingerOptions(wadh.orEmpty(), otp.orEmpty())
         return Intent(if (device.isFace) Pid.FACE_ACTION else Pid.FINGER_ACTION).apply {
             putExtra(if (device.isFace) "request" else "PID_OPTIONS", options)
-            setPackage(device.packageName)
+            setPackage(if (device.packageName == Pid.SELF_PACKAGE) selfPackage.orEmpty() else device.packageName)
         }
     }
 
     fun isInstalled(context: Context, device: RdDevice): Boolean =
-        captureIntent(device, null).resolveActivity(context.packageManager) != null
+        captureIntent(device, null, selfPackage = context.packageName).resolveActivity(context.packageManager) != null
 
     fun openStore(context: Context, packageName: String) {
         val market = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$packageName")).setPackage("com.android.vending")
@@ -61,6 +61,7 @@ object RdServices {
 fun rememberRdCapture(onResult: (CaptureResult) -> Unit): (RdDevice, String?, String?) -> Unit {
     val callback = rememberUpdatedState(onResult)
     val pending = remember { arrayOfNulls<RdDevice>(1) }
+    val selfPackage = androidx.compose.ui.platform.LocalContext.current.packageName
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
         val device = pending[0] ?: return@rememberLauncherForActivityResult
         pending[0] = null
@@ -77,7 +78,7 @@ fun rememberRdCapture(onResult: (CaptureResult) -> Unit): (RdDevice, String?, St
     return remember {
         { device, wadh, otp ->
             pending[0] = device
-            try { launcher.launch(RdServices.captureIntent(device, wadh, otp)) } catch (_: ActivityNotFoundException) {
+            try { launcher.launch(RdServices.captureIntent(device, wadh, otp, selfPackage)) } catch (_: ActivityNotFoundException) {
                 pending[0] = null; callback.value(CaptureResult.NotInstalled)
             }
         }

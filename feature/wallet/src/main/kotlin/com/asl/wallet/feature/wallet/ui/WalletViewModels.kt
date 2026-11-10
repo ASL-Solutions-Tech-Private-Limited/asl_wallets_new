@@ -136,7 +136,7 @@ class AddMoneyViewModel @Inject constructor(
 
     /** One key per payment attempt: a retry of the same "Pay" can't create a second order. */
     private var key: IdempotencyKey? = null
-    val hashes = HashSource { txn, name, data -> repo.payuHash(txn, name, data) }
+    val hashes = HashSource { ask -> repo.payuHash(ask) }
 
     init {
         load()
@@ -170,7 +170,7 @@ class AddMoneyViewModel @Inject constructor(
             when (val r = atLeast { repo.createOrder(amount, k) }) {
                 is NetworkResult.Success -> when (val o = r.data) {
                     is OrderResult.Ready -> {
-                        saved[KEY_TXN] = o.order.txnId; saved[KEY_AMOUNT] = amount.toPlainString()
+                        saved[KEY_TXN] = o.order.statusId; saved[KEY_AMOUNT] = amount.toPlainString()
                         _events.send(AddMoneyEvent.OpenPayU(o.order, config.payuProduction))
                     }
                     OrderResult.NotSupportedYet -> _state.update { it.copy(phase = AddPhase.Form, showSoon = true) }
@@ -182,12 +182,14 @@ class AddMoneyViewModel @Inject constructor(
     }
 
     /** PayU's screens closed. Whatever they said, the server decides. */
-    fun onPayUReturn(order: PayUOrder, ret: PayUReturn) = confirm(order.txnId, order.amount, ret)
+    fun onPayUReturn(order: PayUOrder, ret: PayUReturn, mihpayid: String? = null) = confirm(order.statusId, order.amount, ret, mihpayid)
 
-    private fun confirm(txnId: String, amount: BigDecimal?, ret: PayUReturn) {
+    private fun confirm(txnId: String, amount: BigDecimal?, ret: PayUReturn, mihpayid: String? = null) {
         _state.update { it.copy(phase = AddPhase.Confirming) }
         viewModelScope.launch {
             val started = System.nanoTime()
+            // The app never asks the server to credit (no verify call, decided 9 Nov 2026). PayU tells the server
+            // directly (success/failure URL, webhook); the server credits once. The app only reads status below.
             var result: AddMoneyResult = AddMoneyResult.Pending(txnId, amount)
             for (attempt in 0 until POLLS) {
                 val r = repo.addMoneyStatus(txnId, amount)
@@ -206,7 +208,9 @@ class AddMoneyViewModel @Inject constructor(
         val r = _state.value.result as? AddMoneyResult.Pending ?: return
         _state.update { it.copy(checking = true) }
         viewModelScope.launch {
-            val now = (repo.addMoneyStatus(r.txnId, r.amount) as? NetworkResult.Success)?.data ?: r
+            // Ask by the id the status API takes (clientTxnId), kept while the payment is pending.
+            val id = saved.get<String>(KEY_TXN) ?: r.txnId
+            val now = (repo.addMoneyStatus(id, r.amount) as? NetworkResult.Success)?.data ?: r
             _state.update { it.copy(checking = false) }
             finish(now)
         }
@@ -214,7 +218,8 @@ class AddMoneyViewModel @Inject constructor(
 
     private suspend fun finish(result: AddMoneyResult) {
         if (result !is AddMoneyResult.Pending) { saved.remove<String>(KEY_TXN); saved.remove<String>(KEY_AMOUNT); key = null }
-        val balance = if (result is AddMoneyResult.Success) (repo.overview() as? NetworkResult.Success)?.data?.balance else null
+        // The server's own figure after crediting wins; otherwise read the balance again.
+        val balance = if (result is AddMoneyResult.Success) result.balanceAfter ?: (repo.overview() as? NetworkResult.Success)?.data?.balance else null
         _state.update { it.copy(phase = AddPhase.Result, result = result, newBalance = balance) }
     }
 
@@ -388,13 +393,23 @@ data class SendState(
     val otpUiError: UiError? = null,
     val resendIn: Int = 0,
     val outcome: SendOutcome? = null,
+    /** Set when the payout can't go without the shop's location (the payout API needs it). */
+    val location: LocationNeed? = null,
+    /** Where the payout OTP went (masked), from the server. */
+    val otpTo: String? = null,
 ) {
     val amount: BigDecimal? get() = amountText.toAmount()
     val problem: AmountProblem? get() = setup?.limits?.check(amount, setup.balance)
 }
 
+/** What's missing before a payout: the permission, location turned on, or a fix (no signal). */
+enum class LocationNeed { Permission, TurnOn, NoFix }
+
 @HiltViewModel
-class SendMoneyViewModel @Inject constructor(private val repo: WalletRepository) : ViewModel() {
+class SendMoneyViewModel @Inject constructor(
+    private val repo: WalletRepository,
+    private val location: com.asl.wallet.feature.wallet.data.PayoutLocation,
+) : ViewModel() {
     private val _state = MutableStateFlow(SendState())
     val state: StateFlow<SendState> = _state.asStateFlow()
     private var timer: Job? = null
@@ -413,7 +428,7 @@ class SendMoneyViewModel @Inject constructor(private val repo: WalletRepository)
                     val d = r.data
                     s.copy(
                         phase = if (d.accounts.isEmpty()) SendPhase.NoAccount else SendPhase.Form, setup = d,
-                        account = d.accounts.firstOrNull { it.id == s.account?.id } ?: d.accounts.singleOrNull(),
+                        account = d.accounts.firstOrNull { it.id == s.account?.id && it.verified } ?: d.accounts.filter { it.verified }.singleOrNull(),
                         mode = d.modes.firstOrNull { it == s.mode } ?: d.modes.first(),
                     )
                 }
@@ -421,7 +436,8 @@ class SendMoneyViewModel @Inject constructor(private val repo: WalletRepository)
         }
     }
 
-    fun onAccount(a: SendAccount) = _state.update { it.copy(account = a, formError = null) }
+    /** An account waiting for verification can't be chosen. */
+    fun onAccount(a: SendAccount) { if (a.verified) _state.update { it.copy(account = a, formError = null) } }
     fun onAmount(v: String) = _state.update { it.copy(amountText = cleanAmount(v), formError = null) }
     fun onMode(m: String) = _state.update { it.copy(mode = m) }
 
@@ -431,11 +447,19 @@ class SendMoneyViewModel @Inject constructor(private val repo: WalletRepository)
         if (s.busy || s.phase != SendPhase.Form) return
         val account = s.account
         val amount = s.amount
-        if (account == null || amount == null || s.problem != null) { _state.update { it.copy(showErrors = true) }; return }
-        _state.update { it.copy(busy = true, formError = null) }
+        if (account == null || !account.verified || amount == null || s.problem != null) { _state.update { it.copy(showErrors = true) }; return }
+        // Checked before the OTP, so the retailer isn't sent a code for a payout that can't go.
+        when {
+            !location.hasPermission() -> { _state.update { it.copy(location = LocationNeed.Permission) }; return }
+            !location.isEnabled() -> { _state.update { it.copy(location = LocationNeed.TurnOn) }; return }
+        }
+        _state.update { it.copy(busy = true, formError = null, location = null) }
         viewModelScope.launch {
             when (val r = repo.sendOtp(account, amount, s.mode)) {
-                is NetworkResult.Success -> { _state.update { it.copy(busy = false, otpOpen = true, otp = "", otpError = null, otpUiError = null) }; startTimer() }
+                is NetworkResult.Success -> {
+                    _state.update { it.copy(busy = false, otpOpen = true, otp = "", otpError = null, otpUiError = null, otpTo = r.data ?: it.otpTo) }
+                    startTimer()
+                }
                 is NetworkResult.Failure -> _state.update { it.copy(busy = false, formError = r.toUiError()) }
             }
         }
@@ -454,6 +478,15 @@ class SendMoneyViewModel @Inject constructor(private val repo: WalletRepository)
         }
     }
 
+    /** After the permission prompt or the location settings: carry on if it's now possible. */
+    fun onLocationChanged(granted: Boolean = location.hasPermission()) {
+        if (!granted) { _state.update { it.copy(location = LocationNeed.Permission) }; return }
+        _state.update { it.copy(location = null) }
+        proceed()
+    }
+
+    fun dismissLocation() = _state.update { it.copy(location = null) }
+
     fun onOtp(v: String) = _state.update { it.copy(otp = v.filter(Char::isDigit).take(OTP_LENGTH), otpError = null) }
     fun closeOtp() { timer?.cancel(); _state.update { it.copy(otpOpen = false, otp = "", resendIn = 0) } }
 
@@ -463,11 +496,17 @@ class SendMoneyViewModel @Inject constructor(private val repo: WalletRepository)
         if (s.otp.length != OTP_LENGTH || s.phase != SendPhase.Form) return
         val account = s.account ?: return
         val amount = s.amount ?: return
-        val k = key ?: IdempotencyKey.new().also { key = it }
         _state.update { it.copy(phase = SendPhase.Sending, otpOpen = false) }
         viewModelScope.launch {
             val started = System.nanoTime()
-            val out = repo.sendMoney(account, amount, s.mode, s.otp, k).stamp()
+            // A real fix or nothing is sent: no made-up coordinates.
+            val at = location.current()
+            if (at == null) {
+                _state.update { it.copy(phase = SendPhase.Form, otpOpen = true, location = if (location.isEnabled()) LocationNeed.NoFix else LocationNeed.TurnOn) }
+                return@launch
+            }
+            val k = key ?: IdempotencyKey.new().also { key = it }
+            val out = repo.sendMoney(account, amount, s.mode, s.otp, k, at).stamp()
             when {
                 out is SendOutcome.Failed && out.reason?.contains("otp", ignoreCase = true) == true -> {
                     key = null // the server refused before moving money
@@ -540,7 +579,7 @@ class BankAccountsViewModel @Inject constructor(private val repo: WalletReposito
         val a = _state.value.deleting ?: return
         _state.update { it.copy(busy = true) }
         viewModelScope.launch {
-            val r = repo.deleteBank(a.id)
+            val r = repo.deleteBank(a)
             _state.update { it.copy(busy = false, deleting = null, actionError = (r as? NetworkResult.Failure)?.toUiError()) }
             if (r is NetworkResult.Success) load()
         }

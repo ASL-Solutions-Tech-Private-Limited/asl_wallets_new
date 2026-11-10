@@ -1,5 +1,7 @@
 package com.asl.wallet.feature.reports.ui
 
+import com.asl.wallet.core.designsystem.component.keyboardAware
+import androidx.compose.foundation.layout.imePadding
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -74,7 +76,9 @@ import com.asl.wallet.core.designsystem.component.KeyValue
 import com.asl.wallet.core.designsystem.component.KeyValueList
 import com.asl.wallet.core.designsystem.component.ReceiptCard
 import com.asl.wallet.core.designsystem.component.SectionHeader
+import com.asl.wallet.core.designsystem.component.ServiceArt
 import com.asl.wallet.core.designsystem.component.ServiceGrid
+import com.asl.wallet.core.designsystem.R as DS
 import com.asl.wallet.core.designsystem.component.ServiceItem
 import com.asl.wallet.core.designsystem.component.ShopInfo
 import com.asl.wallet.core.designsystem.component.SkeletonRow
@@ -121,7 +125,7 @@ private fun Scaffold(
     bottom: (@Composable ColumnScope.() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit,
 ) {
     val c = AslTheme.colors
-    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding()) {
+    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding().keyboardAware()) {
         AslTopBar(title, onBack = onBack, actions = actions)
         Column(
             Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 16.dp)
@@ -144,13 +148,13 @@ private fun errorText(e: UiError): String = when (e) {
 @Composable
 private fun Sheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = AslTheme.colors.surface, shape = AslShapes.sheet) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp).padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
+        Column(Modifier.fillMaxWidth().imePadding().navigationBarsPadding().padding(horizontal = 16.dp).padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
     }
 }
 
 @Composable
 private fun TopIcon(icon: ImageVector, label: String, onClick: () -> Unit) =
-    IconButton(onClick = onClick) { Icon(icon, contentDescription = label, tint = AslTheme.colors.textPrimary) }
+    IconButton(onClick = onClick) { Icon(icon, contentDescription = label, tint = androidx.compose.material3.LocalContentColor.current) }
 
 @Composable
 fun kindName(k: ReportKind): String = stringResource(when (k) {
@@ -160,7 +164,19 @@ fun kindName(k: ReportKind): String = stringResource(when (k) {
     ReportKind.Dmt -> R.string.rp_kind_dmt
     ReportKind.Matm -> R.string.rp_kind_matm
     ReportKind.Pan -> R.string.rp_kind_pan
+    ReportKind.AddMoney -> R.string.rp_kind_add_money
 })
+
+/** Classic look: the old app's report icons. */
+private fun kindArt(k: ReportKind): Int = when (k) {
+    ReportKind.Recharge -> DS.drawable.classic_ic_mobile_report
+    ReportKind.Payout -> DS.drawable.classic_ic_payout_report
+    ReportKind.Aeps -> DS.drawable.classic_ic_aeps_report
+    ReportKind.Dmt -> DS.drawable.classic_ic_dmt_report
+    ReportKind.Matm -> DS.drawable.classic_ic_matm_report
+    ReportKind.Pan -> DS.drawable.classic_ic_new_pan_a
+    ReportKind.AddMoney -> DS.drawable.classic_ic_wallet_menu
+}
 
 private fun kindIcon(k: ReportKind): Pair<ImageVector, List<Color>> = when (k) {
     ReportKind.Recharge -> AslIcons.Phone to AslGradients.Service.Recharge.colors
@@ -169,6 +185,7 @@ private fun kindIcon(k: ReportKind): Pair<ImageVector, List<Color>> = when (k) {
     ReportKind.Dmt -> AslIcons.Send to AslGradients.Service.SendMoney.colors
     ReportKind.Matm -> AslIcons.Atm to AslGradients.Service.MicroAtm.colors
     ReportKind.Pan -> AslIcons.Document to AslGradients.Service.Wallet.colors
+    ReportKind.AddMoney -> AslIcons.Plus to AslGradients.success
 }
 
 @Composable
@@ -327,14 +344,14 @@ fun ReportsTab(onLedger: () -> Unit, onReport: (ReportKind) -> Unit, onFundReque
         }
         SectionHeader(stringResource(R.string.rp_service_reports))
         // Fixed order; a tile shows only if the retailer has that service (all while the list loads or fails).
-        val order = listOf(ReportKind.Recharge, ReportKind.Payout, ReportKind.Aeps, ReportKind.Dmt, ReportKind.Matm, ReportKind.Pan)
+        val order = listOf(ReportKind.Recharge, ReportKind.Payout, ReportKind.Aeps, ReportKind.Dmt, ReportKind.AddMoney, ReportKind.Matm, ReportKind.Pan)
         val shown = order.filter { s.loading || s.kinds.isEmpty() || it in s.kinds }
-        val items = shown.map { k -> kindIcon(k).let { (i, col) -> ServiceItem(kindName(k), i, col) } }
+        val items = shown.map { k -> kindIcon(k).let { (i, col) -> ServiceItem(kindName(k), i, col, art = ServiceArt.Picture(kindArt(k))) } }
         ServiceGrid(items, onClick = { item -> onReport(shown[items.indexOf(item)]) })
         SectionHeader(stringResource(R.string.rp_wallet))
         val wallet = listOf(
-            ServiceItem(stringResource(R.string.rp_fund_requests), AslIcons.Upload, AslGradients.Service.Upi.colors),
-            ServiceItem(stringResource(R.string.rp_statement), AslIcons.Document, AslGradients.Service.Wallet.colors),
+            ServiceItem(stringResource(R.string.rp_fund_requests), AslIcons.Upload, AslGradients.Service.Upi.colors, art = ServiceArt.Picture(DS.drawable.classic_ic_fund_req)),
+            ServiceItem(stringResource(R.string.rp_statement), AslIcons.Document, AslGradients.Service.Wallet.colors, art = ServiceArt.Picture(DS.drawable.classic_ic_transction_report)),
         )
         ServiceGrid(wallet, onClick = { if (it == wallet[0]) onFundRequests() else onStatement() })
     }
@@ -352,7 +369,7 @@ fun LedgerScreen(shop: ShopInfo, onBack: () -> Unit, vm: LedgerViewModel = hiltV
     if (e != null) { LedgerEntryPage(e, shop, vm::closeEntry); return }
     val today = remember { Day.today() }
     val c = AslTheme.colors
-    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding()) {
+    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding().keyboardAware()) {
         AslTopBar(stringResource(R.string.rp_ledger), onBack = onBack, actions = {
             TopIcon(AslIcons.Search, stringResource(R.string.rp_search)) { searching = !searching; if (!searching) vm.onSearch("") }
             TopIcon(AslIcons.Calendar, stringResource(R.string.rp_filter)) { filters = true }
@@ -448,7 +465,7 @@ fun ReportScreen(shop: ShopInfo, onBack: () -> Unit, vm: ReportViewModel = hiltV
     val c = AslTheme.colors
     val (icon, colors) = kindIcon(kind)
     val statuses = listOf(null, RowStatus.Success, RowStatus.Pending, RowStatus.Failed)
-    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding()) {
+    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding().keyboardAware()) {
         AslTopBar(stringResource(R.string.rp_report_title, kindName(kind)), onBack = onBack, actions = {
             TopIcon(AslIcons.Search, stringResource(R.string.rp_search)) { searching = !searching; if (!searching) vm.onSearch("") }
             TopIcon(AslIcons.Calendar, stringResource(R.string.rp_filter)) { filters = true }
@@ -459,7 +476,7 @@ fun ReportScreen(shop: ShopInfo, onBack: () -> Unit, vm: ReportViewModel = hiltV
                     if (searching) SearchBox(s.search, stringResource(when (kind) {
                         ReportKind.Recharge -> R.string.rp_search_hint_recharge; ReportKind.Payout -> R.string.rp_search_hint_payout
                         ReportKind.Aeps, ReportKind.Matm -> R.string.rp_search_hint_aeps; ReportKind.Dmt -> R.string.rp_search_hint_dmt
-                        ReportKind.Pan -> R.string.rp_search_hint_pan
+                        ReportKind.Pan -> R.string.rp_search_hint_pan; ReportKind.AddMoney -> R.string.rp_search_hint_add_money
                     }), vm::onSearch)
                     if (kind.hasStatusFilter) ChoiceChips(
                         listOf(stringResource(R.string.rp_all), stringResource(R.string.rp_success), stringResource(R.string.rp_pending), stringResource(R.string.rp_failed)),
@@ -502,6 +519,10 @@ private fun summaryTiles(kind: ReportKind, s: Summary?): List<Triple<String, Str
         ReportKind.Aeps, ReportKind.Matm -> listOfNotNull(
             t[TotalKind.Amount]?.let { Triple(rupees(it), stringResource(R.string.rp_t_withdrawn), AslGradients.success) },
             t[TotalKind.Commission]?.let { Triple(rupees(it), stringResource(R.string.rp_t_commission), AslGradients.Service.Aeps.colors) },
+        )
+        ReportKind.AddMoney -> listOfNotNull(
+            t[TotalKind.Success]?.let { Triple(rupees(it), stringResource(R.string.rp_t_added), AslGradients.success) },
+            t[TotalKind.Pending]?.let { Triple(rupees(it), stringResource(R.string.rp_t_not_completed), AslGradients.pending) },
         )
         ReportKind.Dmt -> listOfNotNull(
             t[TotalKind.Success]?.let { Triple(rupees(it), stringResource(R.string.rp_success), AslGradients.success) },

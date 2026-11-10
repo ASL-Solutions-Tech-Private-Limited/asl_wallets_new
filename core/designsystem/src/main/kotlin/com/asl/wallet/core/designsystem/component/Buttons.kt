@@ -73,13 +73,19 @@ fun AslButton(
     val clickable = enabled && !loading
 
     val bg: Modifier = when (style) {
-        AslButtonStyle.Primary -> Modifier.background(Brush.linearGradient(AslGradients.action), AslShapes.button)
+        // Disabled: a flat grey-blue, clearly different from the navy action colour (fading alone wasn't visible).
+        AslButtonStyle.Primary -> if (enabled) Modifier.background(Brush.linearGradient(AslGradients.action), AslShapes.button)
+            else Modifier.background(if (c.isDark) c.outline else Color(0xFFB9C3D3), AslShapes.button)
         AslButtonStyle.Danger -> Modifier.background(Brush.linearGradient(AslGradients.failed), AslShapes.button)
         AslButtonStyle.Outline -> Modifier
             .background(c.surface, AslShapes.button)
             .border(BorderStroke(1.5.dp, c.outline), AslShapes.button)
     }
-    val content = if (style == AslButtonStyle.Outline) c.primary else Color.White
+    val content = when {
+        style == AslButtonStyle.Outline -> c.primary
+        style == AslButtonStyle.Primary && !enabled -> if (c.isDark) c.textSecondary else Color(0xFF4F5B6E)
+        else -> Color.White
+    }
 
     Box(
         modifier = modifier
@@ -88,7 +94,7 @@ fun AslButton(
             .clip(AslShapes.button)
             .then(bg)
             .then(if (style == AslButtonStyle.Primary && clickable) sweepModifier() else Modifier)
-            .alpha(if (enabled) 1f else 0.45f)
+            .alpha(if (enabled || style == AslButtonStyle.Primary) 1f else 0.45f)
             .clickable(
                 enabled = clickable,
                 role = Role.Button,

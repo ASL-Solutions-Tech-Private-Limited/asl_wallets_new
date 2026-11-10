@@ -221,4 +221,49 @@
         <item quantity="one">%dটি রিকোয়েস্ট</item>
         <item quantity="other">%dটি রিকোয়েস্ট</item>
     </plurals>
+    <!-- Add Money (classic, animated) -->
+    <string name="w_am_current">বর্তমান ওয়ালেট ব্যালেন্স</string>
+    <string name="w_am_after">টপ-আপের পরে</string>
+    <string name="w_am_ask">কত টাকা যোগ করতে চান?</string>
+    <string name="w_am_quick">দ্রুত যোগ</string>
+    <string name="w_am_min">সর্বনিম্ন %1$s</string>
+    <string name="w_am_max">সর্বোচ্চ %1$s</string>
+    <string name="w_am_secured">PayU দ্বারা সুরক্ষিত</string>
+    <string name="w_am_upi">UPI</string>
+    <string name="w_am_cards">কার্ড</string>
+    <string name="w_am_netbanking">নেট ব্যাংকিং</string>
+    <string name="w_am_amount_desc">যোগ করার পরিমাণ, টাকায়</string>
+    <!-- Receipt stamp words (bill for every outcome) -->
+    <string name="w_failed">ব্যর্থ</string>
+    <!-- Payout needs the shop location -->
+    <string name="w_loc_title">লোকেশন দরকার</string>
+    <string name="w_loc_permission">পেআউটের সাথে আপনার দোকানের লোকেশন পাঠানো হয়। চালিয়ে যেতে লোকেশনের অনুমতি দিন।</string>
+    <string name="w_loc_turn_on">ফোনে লোকেশন (GPS) চালু করুন, তারপর আবার Continue চাপুন।</string>
+    <string name="w_loc_nofix_title">আপনার লোকেশন পাওয়া যায়নি</string>
+    <string name="w_loc_nofix">কিছু পাঠানো হয়নি। জানালার কাছে বা বাইরে গিয়ে আবার নিশ্চিত করুন।</string>
+    <string name="w_loc_allow">লোকেশনের অনুমতি দিন</string>
+    <string name="w_loc_settings">সেটিংস খুলুন</string>
+    <string name="w_loc_ok">ঠিক আছে</string>
+    <!-- Payout form (10 Nov 2026) -->
+    <string name="w_po_balance">ওয়ালেট ব্যালেন্স</string>
+    <string name="w_po_after">পেআউটের পরে</string>
+    <string name="w_po_send_to">কোথায় পাঠাবেন</string>
+    <string name="w_po_choose_sub">আপনার নিজের ভেরিফায়েড ব্যাংক অ্যাকাউন্ট</string>
+    <string name="w_po_ask">ব্যাংকে কত টাকা পাঠাতে চান?</string>
+    <string name="w_po_quick">দ্রুত পরিমাণ</string>
+    <string name="w_po_mode">ট্রান্সফারের ধরন</string>
+    <string name="w_po_imps_sub">সঙ্গে সঙ্গে · 24×7</string>
+    <string name="w_po_neft_sub">২ ঘণ্টার মধ্যে · ব্যাংকের সময়ে</string>
+    <string name="w_po_limits">প্রতি পেআউট %1$s থেকে %2$s · চার্জ আপনার প্ল্যান অনুযায়ী</string>
+    <string name="w_po_ac_no">অ্যাকাউন্ট নম্বর</string>
+    <string name="w_po_ifsc">IFSC</string>
+    <string name="w_po_own">নিজের অ্যাকাউন্ট</string>
+    <string name="w_po_relative">আত্মীয়ের অ্যাকাউন্ট</string>
+    <string name="w_po_verified">ভেরিফায়েড</string>
+    <string name="w_po_change">বদলান</string>
+    <string name="w_po_waiting">ভেরিফিকেশন বাকি</string>
+    <string name="w_po_waiting_note">যেসব ব্যাংকের ভেরিফিকেশন বাকি সেগুলোতে এখনও পেআউট যাবে না। ASL এগুলো যাচাই করে; সাধারণত কয়েক ঘণ্টা লাগে।</string>
+    <string name="w_po_none_verified">এখনও কোনো ভেরিফায়েড ব্যাংক নেই</string>
+    <!-- Voice after the receipt -->
+    <string name="w_voice">%1$s টাকার পেআউট আপনার ব্যাংকে পাঠানো হয়েছে।</string>
 </resources>

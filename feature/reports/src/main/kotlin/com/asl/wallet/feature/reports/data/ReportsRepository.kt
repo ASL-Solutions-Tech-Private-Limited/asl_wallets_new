@@ -1,5 +1,6 @@
 package com.asl.wallet.feature.reports.data
 
+import com.asl.wallet.core.network.model.serviceRows
 import com.asl.wallet.core.common.session.CurrentUser
 import com.asl.wallet.core.network.NetworkResult
 import com.asl.wallet.core.network.map
@@ -111,7 +112,7 @@ class ReportsRepositoryImpl @Inject constructor(
     override suspend fun kinds(): Set<ReportKind> {
         kindsCache?.let { return it }
         return when (val r = safeApiCall(json) { api.services() }) {
-            is NetworkResult.Success -> kindsFromServices(r.data).ifEmpty { ReportKind.entries.toSet() }.also { kindsCache = it }
+            is NetworkResult.Success -> kindsFromServices(serviceRows(r.data)).ifEmpty { ReportKind.entries.toSet() }.also { kindsCache = it }
             is NetworkResult.Failure -> ReportKind.entries.toSet()
         }
     }

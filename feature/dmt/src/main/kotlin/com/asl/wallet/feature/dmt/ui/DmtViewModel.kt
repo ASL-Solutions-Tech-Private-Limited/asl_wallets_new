@@ -54,7 +54,10 @@ sealed interface NameCheck {
     data object Idle : NameCheck
     data object Confirm : NameCheck
     data object Loading : NameCheck
-    data class Done(val bankName: String, val differs: Boolean) : NameCheck
+    /** [typed] is what the retailer had typed when it doesn't match the bank (shown as a warning), else null. */
+    data class Done(val bankName: String, val typed: String? = null) : NameCheck {
+        val differs: Boolean get() = typed != null
+    }
     data class Error(val e: UiError) : NameCheck
 }
 
@@ -234,7 +237,7 @@ class DmtViewModel @Inject constructor(
     fun onAccount(v: String) = editForm({ it.copy(account = v.filter(Char::isDigit).take(18)) })
     fun onConfirm(v: String) = editForm({ it.copy(confirm = v.filter(Char::isDigit).take(18)) })
     fun onIfsc(v: String) = editForm({ it.copy(ifsc = v.filter(Char::isLetterOrDigit).take(11).uppercase()) })
-    fun onRecipientName(v: String) = editForm({ it.copy(name = v.filter { c -> c.isLetter() || c == ' ' || c == '.' || c == '\'' }.take(100)) }, keepCheck = true)
+    fun onRecipientName(v: String) = editForm({ it.copy(name = v.filter { c -> RecipientForm.isNameChar(c) }.take(100)) }, keepCheck = true)
     fun onRecipientMobile(v: String) = editForm({ it.copy(mobile = DmtRules.cleanMobile(v)) })
 
     /** Optional and paid (₹ 3): asks first. */
@@ -255,9 +258,10 @@ class DmtViewModel @Inject constructor(
                     val differs = f.name.isNotBlank() && DmtRules.namesDiffer(f.name, r.data)
                     _state.update {
                         it.copy(
-                            nameCheck = NameCheck.Done(r.data, differs),
-                            // A match (or an empty name) takes the bank's name; a different name waits for the retailer.
-                            form = if (differs) it.form.copy(bankName = r.data) else it.form.copy(bankName = r.data, name = r.data),
+                            // The bank's name always goes in the field (retailers shouldn't have to choose);
+                            // a different typed name only shows as a warning under it.
+                            nameCheck = NameCheck.Done(r.data, typed = if (differs) DmtRules.cleanName(f.name) else null),
+                            form = it.form.copy(bankName = r.data, name = r.data),
                         )
                     }
                 }
@@ -266,16 +270,10 @@ class DmtViewModel @Inject constructor(
         }
     }
 
-    fun useBankName() {
-        val c = _state.value.nameCheck as? NameCheck.Done ?: return
-        _state.update { it.copy(form = it.form.copy(name = c.bankName, bankName = c.bankName), nameCheck = NameCheck.Done(c.bankName, differs = false)) }
-    }
-
     fun saveRecipient() {
         val s = _state.value
         val c = s.customer ?: return
-        val nc = s.nameCheck
-        if (s.form.problems().isNotEmpty() || (nc is NameCheck.Done && nc.differs)) { _state.update { it.copy(showErrors = true) }; return }
+        if (s.form.problems().isNotEmpty()) { _state.update { it.copy(showErrors = true) }; return }
         if (s.busy) return
         _state.update { it.copy(busy = true, error = null) }
         viewModelScope.launch {

@@ -448,13 +448,15 @@ data class TxnState(
     val busy: Boolean = false,
     val error: String? = null,
     val showErrors: Boolean = false,
+    /** The customer's Aadhaar consent, ticked by default like the old app; scanning needs it. */
+    val consent: Boolean = true,
     val walletNote: Boolean = false,
 ) {
     val amount: BigDecimal? get() = Money.parse(amountText)
     val aadhaarOk: Boolean get() = Validators.isAadhaar(aadhaar)
     val mobileOk: Boolean get() = Validators.isMobile(mobile)
     val amountOk: Boolean get() = !type.needsAmount || (amount?.let { it >= MIN_AMOUNT && it <= MAX_AMOUNT && it.stripTrailingZeros().scale() <= 0 } == true)
-    val canScan: Boolean get() = aadhaarOk && mobileOk && bank != null && amountOk && !busy
+    val canScan: Boolean get() = aadhaarOk && mobileOk && bank != null && amountOk && consent && !busy
     val needsOtp: Boolean get() = type.needsCustomerOtp(amount)
 
     companion object { val MIN_AMOUNT = BigDecimal(100); val MAX_AMOUNT = BigDecimal(10_000) }
@@ -498,6 +500,8 @@ class AepsTransactionViewModel @Inject constructor(
     fun onBank(b: CustomerBank) = changed { it.copy(bank = b) }
 
     /** Scan pressed. Above ₹5,000 withdrawal: the customer OTP comes first. */
+    fun onConsent(on: Boolean) = _state.update { it.copy(consent = on) }
+
     fun onScanPressed(): Boolean {
         val s = _state.value
         if (!s.canScan) { _state.update { it.copy(showErrors = true) }; return false }

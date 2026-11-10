@@ -81,7 +81,7 @@ class AepsRulesTest {
     }
 
     @Test fun `deposit only for Yes Bank, no Aadhaar Pay, OTP only above 5000 withdrawal`() {
-        assertThat(TxnType.forProvider(AepsProvider.Kotak)).containsExactly(TxnType.Withdraw, TxnType.Balance, TxnType.Statement).inOrder()
+        assertThat(TxnType.forProvider(AepsProvider.Kotak)).containsExactly(TxnType.Withdraw, TxnType.Balance, TxnType.Statement, TxnType.Deposit).inOrder()
         assertThat(TxnType.forProvider(AepsProvider.YesBank)).contains(TxnType.Deposit)
         assertThat(TxnType.entries.map { it.code }).doesNotContain("ADHPAY")
         assertThat(TxnType.Withdraw.needsCustomerOtp(BigDecimal(5000))).isFalse()
@@ -321,6 +321,17 @@ class AepsTransactionViewModelTest {
         vm.onAmount("2000"); assertThat(vm.onScanPressed()).isTrue()
         vm.selectType(TxnType.Balance)
         assertThat(vm.state.value.amountText).isEmpty()
+        assertThat(vm.onScanPressed()).isTrue()
+    }
+
+    @Test fun `Aadhaar consent is ticked by default and scanning needs it`() = runTest {
+        val vm = AepsTransactionViewModel(repo, session, FakeLocation())
+        assertThat(vm.state.value.consent).isTrue()
+        filled(vm)
+        vm.onConsent(false)
+        assertThat(vm.onScanPressed()).isFalse()
+        assertThat(vm.state.value.showErrors).isTrue()
+        vm.onConsent(true)
         assertThat(vm.onScanPressed()).isTrue()
     }
 

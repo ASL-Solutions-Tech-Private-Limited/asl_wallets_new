@@ -19,7 +19,8 @@ import javax.inject.Singleton
 /**
  * Home's small local state:
  * - last good balance + last 3 ledger rows, **encrypted** (shown offline and on cold start; wiped on sign-out),
- * - pinned services per registration number (plain keys like "aeps"; not personal data).
+ * - pinned services per registration number (plain keys like "aeps"; not personal data),
+ * - the Home section order per registration number (plain keys like "recharge").
  */
 interface HomeLocalStore {
     suspend fun snapshot(): HomeSnapshot?
@@ -27,6 +28,8 @@ interface HomeLocalStore {
     suspend fun saveRecent(recent: List<LedgerEntry>)
     fun pins(regno: Long): Flow<List<String>?>
     suspend fun savePins(regno: Long, keys: List<String>)
+    fun sections(regno: Long): Flow<List<String>?>
+    suspend fun saveSections(regno: Long, keys: List<String>)
     suspend fun clearCache()
 }
 
@@ -38,6 +41,7 @@ class DataStoreHomeLocalStore @Inject constructor(
 ) : HomeLocalStore {
     private val snapshotKey = stringPreferencesKey("snapshot")
     private fun pinsKey(regno: Long) = stringPreferencesKey("pins_$regno")
+    private fun sectionsKey(regno: Long) = stringPreferencesKey("sections_$regno")
 
     override suspend fun snapshot(): HomeSnapshot? = read()?.toDomain()
 
@@ -51,6 +55,14 @@ class DataStoreHomeLocalStore @Inject constructor(
 
     override suspend fun savePins(regno: Long, keys: List<String>) {
         ds.edit { it[pinsKey(regno)] = keys.filter { k -> k.isNotEmpty() && k.all(Char::isLetterOrDigit) }.joinToString(",") }
+    }
+
+    override fun sections(regno: Long): Flow<List<String>?> = ds.data.map { p ->
+        p[sectionsKey(regno)]?.split(',')?.map(String::trim)?.filter { it.isNotEmpty() && it.all(Char::isLetterOrDigit) }
+    }
+
+    override suspend fun saveSections(regno: Long, keys: List<String>) {
+        ds.edit { it[sectionsKey(regno)] = keys.filter { k -> k.isNotEmpty() && k.all(Char::isLetterOrDigit) }.joinToString(",") }
     }
 
     override suspend fun clearCache() {

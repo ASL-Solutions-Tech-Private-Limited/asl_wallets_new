@@ -7,6 +7,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import com.asl.wallet.core.designsystem.component.StatusBarTone
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
@@ -46,6 +47,9 @@ import com.asl.wallet.feature.wallet.ui.WalletRoutes
 import com.asl.wallet.feature.wallet.ui.walletGraph
 import com.asl.wallet.feature.recharge.domain.RechargeType
 import com.asl.wallet.feature.recharge.ui.RechargeRoutes
+import com.asl.wallet.feature.bbps.ui.BbpsRoutes
+import com.asl.wallet.feature.profile.domain.AppService
+import com.asl.wallet.feature.bbps.ui.bbpsGraph
 import com.asl.wallet.feature.recharge.ui.rechargeGraph
 import com.asl.wallet.feature.dmt.ui.DmtRoutes
 import com.asl.wallet.feature.dmt.ui.dmtGraph
@@ -71,7 +75,10 @@ import com.asl.wallet.core.designsystem.component.ListRow
 import com.asl.wallet.core.designsystem.icon.AslIcons
 import com.asl.wallet.core.designsystem.theme.AslGradients
 import com.asl.wallet.feature.home.ui.AllServicesScreen
+import com.asl.wallet.feature.home.ui.ArrangeHomeScreen
 import com.asl.wallet.feature.home.ui.EditServicesScreen
+import com.asl.wallet.feature.home.ui.HomeReport
+import com.asl.wallet.feature.reports.domain.ReportKind
 import com.asl.wallet.feature.home.ui.HomeShell
 import com.asl.wallet.feature.home.ui.HomeViewModel
 import com.asl.wallet.feature.home.ui.NotificationsScreen
@@ -98,6 +105,7 @@ object Routes {
     const val HOME = "home"
     const val ALL_SERVICES = "all_services"
     const val EDIT_SERVICES = "edit_services"
+    const val ARRANGE_HOME = "arrange_home"
     const val NOTIFICATIONS = "notifications"
     // Module 3 · Profile & settings
     const val PROFILE_DETAILS = "profile/details"
@@ -128,13 +136,17 @@ fun AslWalletApp(vm: AppViewModel) {
     val sessionVm: SessionViewModel = hiltViewModel()
     val session by sessionVm.state.collectAsStateWithLifecycle()
 
+    val receiptSound by vm.receiptSound.collectAsStateWithLifecycle()
     AslTheme(themeMode) {
+     androidx.compose.runtime.CompositionLocalProvider(com.asl.wallet.core.designsystem.component.LocalReceiptSound provides receiptSound) {
         val dark = AslTheme.colors.isDark
         val view = LocalView.current
+        // Classic look: screens with a blue header register with StatusBarTone, which turns the status-bar icons white.
+        val blueHeader = StatusBarTone.darkHeaders > 0
         SideEffect {
             val window = (view.context as Activity).window
             WindowCompat.getInsetsController(window, view).apply {
-                isAppearanceLightStatusBars = !dark
+                isAppearanceLightStatusBars = !dark && !blueHeader
                 isAppearanceLightNavigationBars = !dark
             }
         }
@@ -144,12 +156,13 @@ fun AslWalletApp(vm: AppViewModel) {
             val nav = rememberNavController()
             when {
                 ui.integrityBlocked -> UnsafeDeviceScreen(ui.integrityIssues, BuildConfig.ALLOW_INTEGRITY_BYPASS, vm::bypassIntegrity)
-                lock == LockState.Locked && session is SessionState.SignedIn -> LockScreen(onUnlocked = vm::onUnlocked)
+                BuildConfig.APP_LOCK_ENABLED && lock == LockState.Locked && session is SessionState.SignedIn -> LockScreen(onUnlocked = vm::onUnlocked)
                 else -> AppNavHost(nav, vm, ui, session, sessionVm)
             }
         }
     }
-}
+     }
+    }
 
 @Composable
 private fun AppNavHost(nav: NavHostController, vm: AppViewModel, ui: AppUiState, session: SessionState, sessionVm: SessionViewModel) {
@@ -164,7 +177,7 @@ private fun AppNavHost(nav: NavHostController, vm: AppViewModel, ui: AppUiState,
     }
     val goHome: () -> Unit = { nav.navigate(Routes.MAIN) { popUpTo(0) { inclusive = true } } }
     val afterSignIn: (Boolean) -> Unit = { needsLock ->
-        if (needsLock) nav.navigate(Routes.LOCK_SETUP) { popUpTo(0) { inclusive = true } } else goHome()
+        if (needsLock && BuildConfig.APP_LOCK_ENABLED) nav.navigate(Routes.LOCK_SETUP) { popUpTo(0) { inclusive = true } } else goHome()
     }
 
     NavHost(nav, startDestination = Routes.SPLASH) {
@@ -210,6 +223,7 @@ private fun AppNavHost(nav: NavHostController, vm: AppViewModel, ui: AppUiState,
                     vm = homeVm,
                     onAllServices = { nav.navigate(Routes.ALL_SERVICES) },
                     onEditServices = { nav.navigate(Routes.EDIT_SERVICES) },
+                    onArrange = { nav.navigate(Routes.ARRANGE_HOME) },
                     onNotifications = { nav.navigate(Routes.NOTIFICATIONS) },
                     onOpenModule = { module, key ->
                         when (module) {
@@ -217,8 +231,11 @@ private fun AppNavHost(nav: NavHostController, vm: AppViewModel, ui: AppUiState,
                             ServiceCatalogue.RECHARGE_MODULE -> nav.navigate(RechargeRoutes.recharge(if ("dth" in key) RechargeType.Dth else RechargeType.Mobile))
                             ServiceCatalogue.DMT_MODULE -> nav.navigate(DmtRoutes.DMT)
                             ServiceCatalogue.PAYOUT_MODULE -> { nav.navigate(WalletRoutes.GRAPH); nav.navigate(WalletRoutes.SEND) }
+                            ServiceCatalogue.BBPS_MODULE -> nav.navigate(BbpsRoutes.bbps(BbpsRoutes.categoryForService(key)))
                         }
                     },
+                    onBbps = { nav.navigate(BbpsRoutes.bbps(it)) },
+                    onCallSupport = { openDialer(nav.context, vm.support.phone) },
                     onWallet = { nav.navigate(WalletRoutes.GRAPH) },
                     onAddMoney = { nav.navigate(WalletRoutes.GRAPH); nav.navigate(WalletRoutes.ADD_MONEY) },
                     reportsTab = {
@@ -230,6 +247,20 @@ private fun AppNavHost(nav: NavHostController, vm: AppViewModel, ui: AppUiState,
                         )
                     },
                     onSeeAll = { nav.navigate(ReportsRoutes.LEDGER) },
+                    onReport = { r ->
+                        when (r) {
+                            HomeReport.Recharge -> nav.navigate(ReportsRoutes.report(ReportKind.Recharge))
+                            HomeReport.Aeps -> nav.navigate(ReportsRoutes.report(ReportKind.Aeps))
+                            HomeReport.Dmt -> nav.navigate(ReportsRoutes.report(ReportKind.Dmt))
+                            HomeReport.Payout -> nav.navigate(ReportsRoutes.report(ReportKind.Payout))
+                            HomeReport.Matm -> nav.navigate(ReportsRoutes.report(ReportKind.Matm))
+                            HomeReport.Pan -> nav.navigate(ReportsRoutes.report(ReportKind.Pan))
+                            HomeReport.Ledger -> nav.navigate(ReportsRoutes.LEDGER)
+                            HomeReport.Statement -> nav.navigate(ReportsRoutes.STATEMENT)
+                            HomeReport.FundRequests -> { nav.navigate(WalletRoutes.GRAPH); nav.navigate(WalletRoutes.REQUESTS) }
+                            HomeReport.Bbps -> homeVm.onComingSoon("BBPS")
+                        }
+                    },
                     profileTab = {
                         ProfileTab(
                             onDetails = { nav.navigate(Routes.PROFILE_DETAILS) },
@@ -247,6 +278,7 @@ private fun AppNavHost(nav: NavHostController, vm: AppViewModel, ui: AppUiState,
                                         ListRow("Foundation showcase", subtitle = "Components, states, security checks (UAT only)", icon = AslIcons.More,
                                             iconColors = AslGradients.Service.Aeps.colors, onClick = { nav.navigate(Routes.SHOWCASE) })
                                     }
+                                    DemoSwitches(vm.demoToggles)
                                 }
                             } else null,
                         )
@@ -259,17 +291,44 @@ private fun AppNavHost(nav: NavHostController, vm: AppViewModel, ui: AppUiState,
             }
             composable(Routes.ALL_SERVICES) { entry -> AllServicesScreen(mainViewModel(nav, entry), onBack = { nav.popBackStack() }) }
             composable(Routes.EDIT_SERVICES) { entry -> EditServicesScreen(mainViewModel(nav, entry), onDone = { nav.popBackStack() }) }
+            composable(Routes.ARRANGE_HOME) { entry -> ArrangeHomeScreen(mainViewModel(nav, entry), onDone = { nav.popBackStack() }) }
             composable(Routes.NOTIFICATIONS) { NotificationsScreen(onBack = { nav.popBackStack() }) }
         }
         // Module 3 · Profile & settings
         val back: () -> Unit = { nav.popBackStack() }
         composable(Routes.PROFILE_DETAILS) { ProfileDetailsScreen(onBack = back) }
         composable(Routes.COMMISSION) { CommissionScreen(onBack = back) }
-        composable(Routes.ACTIVE_SERVICES) { ActiveServicesScreen(onBack = back) }
+        composable(Routes.ACTIVE_SERVICES) {
+            var aepsChooser by rememberSaveable { mutableStateOf(false) }
+            ActiveServicesScreen(
+                onBack = back,
+                onOpen = { svc ->
+                    when (svc) {
+                        AppService.Aeps -> aepsChooser = true
+                        AppService.MoneyTransfer -> nav.navigate(DmtRoutes.DMT)
+                        AppService.Payout -> { nav.navigate(WalletRoutes.GRAPH); nav.navigate(WalletRoutes.SEND) }
+                        AppService.MobileRecharge -> nav.navigate(RechargeRoutes.recharge(RechargeType.Mobile))
+                        AppService.DthRecharge -> nav.navigate(RechargeRoutes.recharge(RechargeType.Dth))
+                        AppService.BillPayment -> nav.navigate(BbpsRoutes.bbps())
+                        else -> Unit // not built: the screen shows "coming soon" instead
+                    }
+                },
+                onCall = { openDialer(nav.context, vm.support.phone) },
+                onWhatsApp = { openWhatsApp(nav.context, vm.support.whatsapp) },
+            )
+            if (aepsChooser) AepsBankChooserSheet(
+                onChosen = { p -> aepsChooser = false; nav.navigate(AepsRoutes.gate(p)) },
+                onDismiss = { aepsChooser = false },
+            )
+        }
         composable(Routes.CHANGE_PASSWORD) { ChangePasswordScreen(onDone = back, onBack = back) }
         composable(Routes.APP_SETTINGS) {
             val mode by vm.themeMode.collectAsStateWithLifecycle()
-            ProfileSettingsScreen(themeMode = mode, onTheme = vm::setTheme, versionName = BuildConfig.VERSION_NAME, onBack = back)
+            val sound by vm.receiptSound.collectAsStateWithLifecycle()
+            ProfileSettingsScreen(
+                themeMode = mode, onTheme = vm::setTheme, versionName = BuildConfig.VERSION_NAME, onBack = back,
+                onArrangeHome = { nav.navigate(Routes.ARRANGE_HOME) }, sound = sound, onSound = vm::setReceiptSound,
+            )
         }
         composable(Routes.HELP) {
             HelpScreen(vm.support, onRaise = { nav.navigate(Routes.RAISE_COMPLAINT) }, onMyComplaints = { nav.navigate(Routes.MY_COMPLAINTS) }, onFeedback = { nav.navigate(Routes.FEEDBACK) }, onBack = back)
@@ -301,6 +360,17 @@ private fun AppNavHost(nav: NavHostController, vm: AppViewModel, ui: AppUiState,
             onWhatsAppSupport = { openWhatsApp(context, vm.support.whatsapp) },
         )
         // Module 5A · Recharge
+        bbpsGraph(
+            shop = {
+                val u by vm.currentUser.user.collectAsStateWithLifecycle()
+                ShopInfo(u?.shopName?.ifBlank { null } ?: u?.name.orEmpty(), u?.regno?.let { "R-$it" }.orEmpty(), "")
+            },
+            onBack = { nav.popBackStack() },
+            onAddMoney = { nav.navigate(WalletRoutes.GRAPH); nav.navigate(WalletRoutes.ADD_MONEY) },
+            onFundRequest = { nav.navigate(WalletRoutes.GRAPH); nav.navigate(WalletRoutes.FUND) },
+            onCallSupport = { openDialer(context, vm.support.phone) },
+            onWhatsAppSupport = { openWhatsApp(context, vm.support.whatsapp) },
+        )
         rechargeGraph(
             shop = {
                 val u by vm.currentUser.user.collectAsStateWithLifecycle()
@@ -349,4 +419,18 @@ private fun AppNavHost(nav: NavHostController, vm: AppViewModel, ui: AppUiState,
 private fun mainViewModel(nav: NavHostController, entry: NavBackStackEntry): HomeViewModel {
     val parent = remember(entry) { nav.getBackStackEntry(Routes.MAIN) }
     return hiltViewModel(parent)
+}
+
+/** UAT only: the demo switches (e.g. AEPS demo), each remembered on the phone. */
+@Composable
+private fun DemoSwitches(toggles: Set<com.asl.wallet.core.common.demo.DemoToggle>) {
+    if (toggles.isEmpty()) return
+    ListCard {
+        toggles.forEachIndexed { i, t ->
+            if (i > 0) com.asl.wallet.core.designsystem.component.Divider()
+            var on by remember(t) { mutableStateOf(t.isOn()) }
+            ListRow(t.title, subtitle = t.subtitle, icon = AslIcons.Shield, iconColors = AslGradients.Service.Recharge.colors,
+                trailing = { androidx.compose.material3.Switch(on, { v -> t.set(v); on = v }) }, onClick = { t.set(!on); on = !on })
+        }
+    }
 }

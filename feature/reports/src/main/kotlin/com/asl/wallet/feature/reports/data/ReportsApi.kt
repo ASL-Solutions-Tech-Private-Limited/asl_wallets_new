@@ -32,7 +32,7 @@ interface ReportsApi {
     suspend fun complain(@Url path: String, @Body body: ComplainRequest): Response<ApiEnvelope<JsonElement>>
 
     @GET("merchant/services")
-    suspend fun services(): Response<ApiEnvelope<List<JsonObject>>>
+    suspend fun services(): Response<ApiEnvelope<JsonElement>>
 }
 
 @Serializable data class ComplainRequest(val servid: String, val complainText: String)

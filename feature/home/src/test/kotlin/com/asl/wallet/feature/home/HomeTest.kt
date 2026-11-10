@@ -1,5 +1,7 @@
 package com.asl.wallet.feature.home
 
+import com.asl.wallet.feature.home.domain.HomeLayout
+import com.asl.wallet.feature.home.domain.HomeSection
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import app.cash.turbine.test
 import com.asl.wallet.core.common.session.CurrentUser
@@ -103,7 +105,11 @@ class ServiceCatalogueTest {
 
     @Test fun `AEPS opens in the app and Aadhaar Pay is hidden`() {
         val list = ServiceCatalogue.fromServer(listOf(dto("AEPS (KOTAK BANK)", 1), dto("Aadhaar Pay", 2), dto("AADHAR PAY", 3), dto("Micro ATM", 4)))
-        assertThat(list.map { it.name }).containsExactly("AEPS (KOTAK BANK)", "Micro ATM").inOrder()
+        assertThat(list.map { it.name }).containsExactly("AEPS", "Micro ATM").inOrder()
+        // Two AEPS banks from the server are one AEPS tile; the AEPS flow asks for the bank.
+        val two = ServiceCatalogue.fromServer(listOf(dto("AEPS (YES BANK)", 1), dto("DMT", 2), dto("AEPS (KOTAK BANK)", 3)))
+        assertThat(two.map { it.name }).containsExactly("AEPS", "DMT").inOrder()
+        assertThat(two.first().key).isEqualTo(ServiceCatalogue.AEPS_KEY)
         assertThat(list[0].destination).isEqualTo(ServiceDestination.App(ServiceCatalogue.AEPS_MODULE))
         assertThat(list[1].destination).isEqualTo(ServiceDestination.ComingSoon)
         assertThat(ServiceCatalogue.fallback().first { it.kind == ServiceKind.Aeps }.destination).isEqualTo(ServiceDestination.App(3))
@@ -149,6 +155,9 @@ private class MemLocal : HomeLocalStore {
     override suspend fun saveRecent(recent: List<LedgerEntry>) { snap = HomeSnapshot(snap?.wallet, recent) }
     override fun pins(regno: Long): Flow<List<String>?> = pinsByRegno.map { it[regno] }
     override suspend fun savePins(regno: Long, keys: List<String>) { pinsByRegno.value = pinsByRegno.value + (regno to keys) }
+    val sectionsByRegno = MutableStateFlow<Map<Long, List<String>>>(emptyMap())
+    override fun sections(regno: Long): Flow<List<String>?> = sectionsByRegno.map { it[regno] }
+    override suspend fun saveSections(regno: Long, keys: List<String>) { sectionsByRegno.value = sectionsByRegno.value + (regno to keys) }
     override suspend fun clearCache() { snap = null }
 }
 
@@ -206,10 +215,17 @@ class HomeRepositoryTest {
             {"id":2,"services_name":"SBI CSP","services_link":"https://csp.sbi.co.in","service_order":2,"status":"1"}]}""")
         val second = repo.services()
         assertThat(second.fromServer).isTrue()
-        assertThat(second.services.map { it.name }).containsExactly("AEPS", "SBI CSP").inOrder()
+        assertThat(second.services.map { it.name }).containsExactly("AEPS", "SBI CSP", "Payout").inOrder()
 
         respond(500, """{"status":false}""")
         assertThat(repo.services()).isEqualTo(second)
+    }
+
+    @Test fun `services are read from the object shape UAT sends now, and Payout is never added twice`() = runTest {
+        respond(200, """{"status":true,"data":{"totalServices":2,"services":[{"id":86,"services_name":"DMT","service_order":1,"status":1},{"id":9,"services_name":"Payout","service_order":2,"status":1}]}}""")
+        val r = repo.services()
+        assertThat(r.fromServer).isTrue()
+        assertThat(r.services.map { it.name }).containsExactly("DMT", "Payout").inOrder()
     }
 
     @Test fun `account and Aadhaar numbers in ledger text are masked (UAT row)`() {
@@ -295,6 +311,10 @@ private class FakeHomeRepo : HomeRepository {
     override suspend fun services() = servicesResult
     override fun pins(regno: Long): Flow<List<String>?> = pins
     override suspend fun savePins(regno: Long, keys: List<String>) { savedFor = regno; pins.value = keys }
+    val sections = MutableStateFlow<List<String>?>(null)
+    var sectionsSavedFor: Long? = null
+    override fun sections(regno: Long): Flow<List<String>?> = sections
+    override suspend fun saveSections(regno: Long, keys: List<String>) { sectionsSavedFor = regno; sections.value = keys }
 }
 
 class HomeViewModelTest {
@@ -316,6 +336,32 @@ class HomeViewModelTest {
         assertThat(s.recent).containsExactly(row)
         assertThat(s.user?.firstName).isEqualTo("Ajay")
         assertThat(s.offline).isFalse()
+    }
+
+    @Test fun `Arrange Home - saved order shows, moves and saves for this retailer, cancel keeps the old order`() = runTest {
+        repo.sections.value = listOf("recharge", "banking")
+        val (_, vm) = vm()
+        runCurrent()
+        // Saved sections first, the rest after in their default order.
+        assertThat(vm.state.value.sections.first()).isEqualTo(HomeSection.Recharge)
+        assertThat(vm.state.value.sections).hasSize(HomeSection.entries.size)
+
+        vm.startArrange()
+        vm.moveSection(5, 0) // Recent to the top
+        vm.cancelArrange()
+        assertThat(vm.state.value.sections.first()).isEqualTo(HomeSection.Recharge)
+
+        vm.startArrange()
+        vm.moveSection(0, 1)
+        vm.saveArrange()
+        runCurrent()
+        assertThat(vm.state.value.arranging).isNull()
+        assertThat(vm.state.value.sections.take(2)).containsExactly(HomeSection.Banking, HomeSection.Recharge).inOrder()
+        assertThat(repo.sectionsSavedFor).isEqualTo(6044L)
+        assertThat(repo.sections.value!!.take(2)).containsExactly("banking", "recharge").inOrder()
+
+        vm.startArrange(); vm.resetArrange(); vm.saveArrange(); runCurrent()
+        assertThat(vm.state.value.sections).isEqualTo(HomeLayout.DEFAULT)
     }
 
     @Test fun `balance hides itself after 10 seconds and again after being shown`() = runTest {
@@ -354,22 +400,25 @@ class HomeViewModelTest {
         assertThat(vm.state.value.offline).isFalse()
     }
 
-    @Test fun `no KYC locks - AEPS and Recharge open their modules, unbuilt services say coming soon`() = runTest {
+    @Test fun `no KYC locks - AEPS, Recharge and BBPS open their modules, unbuilt services say coming soon`() = runTest {
         val (_, vm) = vm(retailer.copy(kycDone = false))
         runCurrent()
         val s = vm.state.value
         val aeps = s.services.first { it.name == "AEPS" }
         val mobile = s.services.first { it.name == "Mobile recharge" }
         val fastag = s.services.first { it.name == "FASTag" }
+        val matm = s.services.first { it.name == "Micro ATM" }
         vm.events.test {
             vm.onServiceClick(aeps)
             assertThat(awaitItem()).isEqualTo(HomeEvent.OpenModule(3, aeps.key))
             vm.onServiceClick(mobile)
             assertThat(awaitItem()).isEqualTo(HomeEvent.OpenModule(ServiceCatalogue.RECHARGE_MODULE, mobile.key))
+            vm.onServiceClick(fastag)
+            assertThat(awaitItem()).isEqualTo(HomeEvent.OpenModule(ServiceCatalogue.BBPS_MODULE, fastag.key))
         }
         assertThat(vm.state.value.sheet).isNull()
-        vm.onServiceClick(fastag)
-        assertThat(vm.state.value.sheet).isEqualTo(ServiceSheet.ComingSoon(fastag))
+        vm.onServiceClick(matm)
+        assertThat(vm.state.value.sheet).isEqualTo(ServiceSheet.ComingSoon(matm))
     }
 
     @Test fun `partner site opens only after confirming, with the https URL`() = runTest {
@@ -419,5 +468,24 @@ class HomeViewModelTest {
         runCurrent()
         vm.onQueryChange("atm")
         assertThat(vm.state.value.searchResults.map(HomeService::name)).containsExactly("Micro ATM")
+    }
+}
+
+class HomeLayoutTest {
+    @Test fun `parse keeps saved order, drops junk and repeats, and adds missing sections at the end`() {
+        assertThat(HomeLayout.parse(null)).isEqualTo(HomeLayout.DEFAULT)
+        val p = HomeLayout.parse(listOf("reports", "nope", "reports", " recharge "))
+        assertThat(p.take(2)).containsExactly(HomeSection.Reports, HomeSection.Recharge).inOrder()
+        assertThat(p.toSet()).isEqualTo(HomeSection.entries.toSet())
+        assertThat(p).hasSize(HomeSection.entries.size)
+    }
+
+    @Test fun `move shifts one section and clamps out-of-range targets`() {
+        val d = HomeLayout.DEFAULT
+        assertThat(HomeLayout.move(d, 2, 0).first()).isEqualTo(HomeSection.Recharge)
+        assertThat(HomeLayout.move(d, 0, 99).last()).isEqualTo(HomeSection.Banking)
+        assertThat(HomeLayout.move(d, 0, -5)).isEqualTo(d)
+        assertThat(HomeLayout.move(d, 42, 0)).isEqualTo(d)
+        assertThat(HomeLayout.parse(HomeLayout.keys(HomeLayout.move(d, 3, 1)))).isEqualTo(HomeLayout.move(d, 3, 1))
     }
 }

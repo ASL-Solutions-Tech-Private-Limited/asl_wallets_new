@@ -65,7 +65,7 @@ fun LockScreen(onUnlocked: () -> Unit) {
     LaunchedEffect(secure) { if (secure) prompt() }
 
     Box(
-        Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF06163A), Color(0xFF16308C), Color(0xFF494FE6)))).systemBarsPadding(),
+        Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF03274B), Color(0xFF0C4DA2), Color(0xFF1565C0)))).systemBarsPadding(),
         contentAlignment = Alignment.Center,
     ) {
         Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {

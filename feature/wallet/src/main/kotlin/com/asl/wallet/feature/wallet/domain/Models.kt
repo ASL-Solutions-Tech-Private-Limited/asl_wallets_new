@@ -49,11 +49,16 @@ data class AddMoneyInfo(val balance: BigDecimal?, val limits: Limits, val modes:
  * What the server returns for one payment: the ASL txn id and every field the PayU SDK needs, hashes included.
  * The PayU salt never reaches the app. [params] are passed to the SDK as they are.
  */
-data class PayUOrder(val txnId: String, val amount: BigDecimal, val params: Map<String, String>)
+/**
+ * [txnId] is PayU's transaction id (what the SDK and PayU use). [statusId] is what the backend's status API takes:
+ * its clientTxnId (e.g. "PAYU6044_…"), or the txnid when the server sends no clientTxnId.
+ */
+data class PayUOrder(val txnId: String, val amount: BigDecimal, val params: Map<String, String>, val statusId: String = txnId)
 
 sealed interface AddMoneyResult {
     val txnId: String
-    data class Success(override val txnId: String, val amount: BigDecimal?, val mode: String?, val payuRef: String?) : AddMoneyResult
+    /** [balanceAfter]: the wallet balance the server reports after crediting, when it sends one. */
+    data class Success(override val txnId: String, val amount: BigDecimal?, val mode: String?, val payuRef: String?, val balanceAfter: BigDecimal? = null) : AddMoneyResult
     data class Pending(override val txnId: String, val amount: BigDecimal?) : AddMoneyResult
     data class Failed(override val txnId: String, val amount: BigDecimal?, val reason: String?) : AddMoneyResult
 }
@@ -63,10 +68,10 @@ object AddMoneyStatus {
     private val FAILED = setOf("FAILED", "FAILURE", "CANCELLED", "CANCELED", "USER_CANCELLED", "USERCANCELLED", "EXPIRED", "DECLINED", "BOUNCED", "DROPPED", "REJECTED")
 
     /** The wallet counts as credited only on a server SUCCESS. Anything unknown is Pending, never Success. */
-    fun of(status: String?, complete: Boolean?, txnId: String, amount: BigDecimal?, mode: String?, payuRef: String?, reason: String?): AddMoneyResult {
+    fun of(status: String?, complete: Boolean?, txnId: String, amount: BigDecimal?, mode: String?, payuRef: String?, reason: String?, balanceAfter: BigDecimal? = null): AddMoneyResult {
         val s = status?.trim()?.uppercase()?.replace(" ", "_")
         return when {
-            s in OK -> AddMoneyResult.Success(txnId, amount, mode, payuRef)
+            s in OK -> AddMoneyResult.Success(txnId, amount, mode, payuRef, balanceAfter)
             s in FAILED -> AddMoneyResult.Failed(txnId, amount, reason)
             else -> AddMoneyResult.Pending(txnId, amount)
         }.let { if (it is AddMoneyResult.Success && complete == false) AddMoneyResult.Pending(txnId, amount) else it }
@@ -143,7 +148,10 @@ data class FundRequestForm(
 
 // ---------------------------------------------------------------- 4.20–4.26 Send to bank
 
-data class SendAccount(val id: String, val bankName: String, val accountLast4: String, val holder: String, val ifsc: String)
+/** [accountNumber] is the full number the payout API needs; never shown (only [accountLast4]) and never printed. */
+data class SendAccount(val id: String, val bankName: String, val accountLast4: String, val holder: String, val ifsc: String, val accountNumber: String = "", val owner: AccountOwner = AccountOwner.Self, val verified: Boolean = true) {
+    override fun toString() = "SendAccount(id=$id, bank=$bankName, ••$accountLast4)"
+}
 
 data class SendMoneySetup(
     /** Verified accounts only: unverified ones can never receive money. */
@@ -188,7 +196,11 @@ data class BankAccount(
     val ifsc: String,
     val owner: AccountOwner,
     val verified: Boolean,
-)
+    /** Full number: delete-bank names the account by it. Never shown and never printed. */
+    val accountNumber: String = "",
+) {
+    override fun toString() = "BankAccount(id=$id, bank=$bankName, ••$accountLast4, verified=$verified)"
+}
 
 data class BankOption(val id: String, val name: String)
 

@@ -24,6 +24,7 @@ import com.asl.wallet.feature.wallet.domain.FundStatus
 import com.asl.wallet.feature.wallet.domain.FundSummary
 import com.asl.wallet.feature.wallet.domain.Limits
 import com.asl.wallet.feature.wallet.domain.PayUOrder
+import com.asl.wallet.feature.wallet.payu.HashAsk
 import com.asl.wallet.feature.wallet.domain.SendAccount
 import com.asl.wallet.feature.wallet.domain.SendMoneySetup
 import com.asl.wallet.feature.wallet.domain.SendOutcome
@@ -61,7 +62,7 @@ interface WalletRepository {
     /** [key] is one per Pay tap; the same key is reused if the same order is retried. */
     suspend fun createOrder(amount: BigDecimal, key: IdempotencyKey): NetworkResult<OrderResult>
     suspend fun addMoneyStatus(txnId: String, amount: BigDecimal?): NetworkResult<AddMoneyResult>
-    suspend fun payuHash(txnId: String, hashName: String, hashString: String): String?
+    suspend fun payuHash(ask: HashAsk): String?
 
     suspend fun fundSetup(): NetworkResult<FundRequestSetup>
     suspend fun submitFund(form: FundRequestForm, adminId: String, editId: Long? = null): NetworkResult<String?>
@@ -69,20 +70,23 @@ interface WalletRepository {
     suspend fun fundRequests(page: Int, status: FundStatus?): NetworkResult<FundRequestPage>
 
     suspend fun sendSetup(): NetworkResult<SendMoneySetup>
-    suspend fun sendOtp(account: SendAccount, amount: BigDecimal, mode: String): NetworkResult<Unit>
-    /** Never throws and never retries: a timeout is [SendOutcome.Pending]. */
-    suspend fun sendMoney(account: SendAccount, amount: BigDecimal, mode: String, otp: String, key: IdempotencyKey): SendOutcome
+    /** Success carries where the OTP went (masked mobile), when the server says. */
+    suspend fun sendOtp(account: SendAccount, amount: BigDecimal, mode: String): NetworkResult<String?>
+    /** Never throws and never retries: a timeout is [SendOutcome.Pending]. [at] is the shop's real location. */
+    suspend fun sendMoney(account: SendAccount, amount: BigDecimal, mode: String, otp: String, key: IdempotencyKey, at: ShopLocation): SendOutcome
 
     suspend fun bankAccounts(): NetworkResult<List<BankAccount>>
     suspend fun bankOptions(): NetworkResult<List<BankOption>>
     suspend fun addBank(form: AddBankForm, pan: ByteArray, passbook: ByteArray): NetworkResult<BankAccount>
-    suspend fun deleteBank(id: Long): NetworkResult<Unit>
+    suspend fun deleteBank(account: BankAccount): NetworkResult<Unit>
 }
 
 @Singleton
 class WalletRepositoryImpl @Inject constructor(
     private val api: WalletApi,
     private val json: Json,
+    /** A Provider: read lazily (the session owner depends on repositories). */
+    private val currentUser: javax.inject.Provider<com.asl.wallet.core.common.session.CurrentUser>,
 ) : WalletRepository {
 
     @Volatile private var options: List<BankOption>? = null
@@ -122,18 +126,21 @@ class WalletRepositoryImpl @Inject constructor(
     }
 
     override suspend fun createOrder(amount: BigDecimal, key: IdempotencyKey) =
-        safeApiCall(json) { api.addMoney(key.value, AddMoneyRequest(amount.toPlainString())) }.map { PayUFields.read(it, amount) }
+        safeApiCall(json) { api.addMoney(key.value, PayUInitiateRequest(JsonPrimitive(amount.stripTrailingZeros().let { if (it.scale() < 0) it.setScale(0) else it }), PAYMENT_PURPOSE, isAndroid = true)) }
+            .map { PayUFields.read(it, amount) }
+
 
     override suspend fun addMoneyStatus(txnId: String, amount: BigDecimal?) = safeApiCall(json) { api.addMoneyStatus(txnId) }.map { d ->
         AddMoneyStatus.of(
-            status = d.status, complete = d.isPaymentComplete, txnId = d.clientTxnId ?: d.txnid ?: txnId,
+            // Success only once the wallet is credited: walletCredited=false keeps it Pending.
+            status = d.status, complete = if (d.walletCredited == false) false else d.isPaymentComplete, txnId = d.txnid ?: d.clientTxnId ?: txnId,
             amount = d.amount.amount() ?: amount, mode = d.paymentMode ?: d.mode, payuRef = d.mihpayid ?: d.bankRefNo,
-            reason = d.reason ?: d.message,
+            reason = d.reason ?: d.message, balanceAfter = d.balanceAfter.amount(),
         )
     }
 
-    override suspend fun payuHash(txnId: String, hashName: String, hashString: String): String? =
-        (safeApiCall(json) { api.payuHash(PayUHashRequest(txnId, hashName, hashString)) } as? NetworkResult.Success)?.data?.hash?.ifBlank { null }
+    override suspend fun payuHash(ask: HashAsk): String? =
+        (safeApiCall(json) { api.payuHash(PayUHashRequest(ask.txnId, ask.hashName, ask.hashString, ask.postSalt, ask.hashType)) } as? NetworkResult.Success)?.data?.hash?.ifBlank { null }
 
     // ------------------------------------------------------------ fund request
 
@@ -184,44 +191,43 @@ class WalletRepositoryImpl @Inject constructor(
 
     // ------------------------------------------------------------ send money
 
-    override suspend fun sendSetup() = safeApiCall(json) { api.sendMoneyInfo() }.map { d ->
-        SendMoneySetup(
-            accounts = d.accounts.filter { it.isverify.flag() != false }.mapNotNull { it.toSend() },
-            balance = d.wallet?.balanceAmt.amount() ?: d.wallet?.balance_amt.amount(),
-            limits = d.limits.toLimits(DEFAULT_SEND_LIMITS),
-            modes = d.payoutModes.ifEmpty { listOf("IMPS") },
-            notes = d.notes.map { it.trim() }.filter { it.isNotEmpty() },
-            otpTo = d.user?.phone?.let(Masking::mobile),
-        )
+    // Payout uses the payout collection (merchant/payout/..., user 10 Nov 2026): banks, OTP and the payout itself.
+
+    override suspend fun sendSetup(): NetworkResult<SendMoneySetup> = when (val r = safeApiCall(json) { api.payoutBanks() }) {
+        is NetworkResult.Failure -> r
+        is NetworkResult.Success -> {
+            val balance = (overview() as? NetworkResult.Success)?.data?.balance
+            NetworkResult.Success(
+                SendMoneySetup(
+                    // Every active bank is listed; only verified ones can receive money (the screen shows the rest as
+                    // waiting for verification, so a retailer sees all their banks).
+                    accounts = readPayoutBanks(r.data).map { b ->
+                        SendAccount(b.id.toString(), b.bankName, b.accountLast4, b.holder, b.ifsc, b.accountNumber, b.owner, b.verified)
+                    },
+                    balance = balance, limits = DEFAULT_SEND_LIMITS, modes = PAYOUT_MODES, notes = emptyList(), otpTo = null,
+                ),
+                r.message,
+            )
+        }
     }
 
-    override suspend fun sendOtp(account: SendAccount, amount: BigDecimal, mode: String): NetworkResult<Unit> =
-        when (val r = safeApiCall(json, allowEmptyData = true) { api.sendMoney(null, SendMoneyRequest(account.id, amount.toPlainString(), mode)) }) {
+    override suspend fun sendOtp(account: SendAccount, amount: BigDecimal, mode: String): NetworkResult<String?> =
+        when (val r = safeApiCall(json, allowEmptyData = true) { api.payoutSendOtp() }) {
             is NetworkResult.Failure -> r
-            // A 200 with an inner `status: false` is a refusal (e.g. limits), not "OTP sent".
-            is NetworkResult.Success -> (r.data as? SendMoneyResultDto)?.takeIf { it.status?.booleanOrNull == false }
-                ?.let { NetworkResult.Failure.Api(422, "INNER_STATUS", it.message ?: "The OTP couldn't be sent.") } ?: NetworkResult.Success(Unit, r.message)
+            // A 200 with an inner `status: false` is a refusal, not "OTP sent". UAT: data {fname, mob: "••••3077"}.
+            is NetworkResult.Success -> innerRefusal(r.body())?.let { NetworkResult.Failure.Api(422, "INNER_STATUS", it) }
+                ?: NetworkResult.Success((r.body() as? JsonObject)?.text("mob", "mobile", "phone")?.let(Masking::mobile), r.message)
         }
 
-    override suspend fun sendMoney(account: SendAccount, amount: BigDecimal, mode: String, otp: String, key: IdempotencyKey): SendOutcome {
-        val r = safeApiCall(json) { api.sendMoney(key.value, SendMoneyRequest(account.id, amount.toPlainString(), mode, otp)) }
+    override suspend fun sendMoney(account: SendAccount, amount: BigDecimal, mode: String, otp: String, key: IdempotencyKey, at: ShopLocation): SendOutcome {
+        val body = PayoutRequest(
+            accountNumber = account.accountNumber, amount = JsonPrimitive(amount), paymentMode = mode,
+            latitude = "%.6f".format(java.util.Locale.ROOT, at.latitude), longitude = "%.6f".format(java.util.Locale.ROOT, at.longitude),
+            otp = otp, source = "APPS",
+        )
+        val r = safeApiCall(json, allowEmptyData = true) { api.payout(key.value, body) }
         return when (r) {
-            is NetworkResult.Success -> {
-                val d = r.data
-                val receipt = SendReceipt(
-                    amount = d.payamt.amount() ?: amount, charge = d.serviceCharge.amount(), totalDebited = d.totalDebited.amount(),
-                    holder = d.beneficiaryName?.trim()?.ifEmpty { null } ?: account.holder,
-                    bankName = d.bankName?.trim()?.ifEmpty { null } ?: account.bankName,
-                    accountLast4 = d.accountNumber?.filter(Char::isLetterOrDigit)?.takeLast(4)?.ifEmpty { null } ?: account.accountLast4,
-                    mode = d.paytype ?: mode, bankRef = d.utr ?: d.refno, txnId = d.servid, time = "",
-                )
-                if (d.status?.booleanOrNull == false) return SendOutcome.Failed(d.message) // inner refusal, e.g. wrong OTP
-                when (d.status?.contentOrNull?.trim()?.uppercase()) {
-                    "SUCCESS", "SUCCESSFUL", "COMPLETED" -> SendOutcome.Sent(receipt)
-                    "FAILED", "FAILURE", "DECLINED", "REJECTED" -> SendOutcome.Failed(d.message)
-                    else -> SendOutcome.Pending(receipt)
-                }
-            }
+            is NetworkResult.Success -> readPayoutResult(r.body(), account, amount, mode)
             // The request may have reached the bank: Pending, and the same key is kept if the retailer checks.
             NetworkResult.Failure.Timeout, NetworkResult.Failure.NoInternet -> SendOutcome.Pending(null)
             is NetworkResult.Failure.Api -> if (r.httpCode >= 500) SendOutcome.Pending(null) else SendOutcome.Failed(r.message)
@@ -231,7 +237,7 @@ class WalletRepositoryImpl @Inject constructor(
 
     // ------------------------------------------------------------ bank accounts
 
-    override suspend fun bankAccounts() = safeApiCall(json) { api.bankAccounts() }.map { list -> list.mapNotNull { it.toAccount() } }
+    override suspend fun bankAccounts(): NetworkResult<List<BankAccount>> = safeApiCall(json) { api.payoutBanks() }.map(::readPayoutBanks)
 
     override suspend fun bankOptions(): NetworkResult<List<BankOption>> {
         options?.let { return NetworkResult.Success(it, null) }
@@ -245,26 +251,36 @@ class WalletRepositoryImpl @Inject constructor(
     }
 
     override suspend fun addBank(form: AddBankForm, pan: ByteArray, passbook: ByteArray): NetworkResult<BankAccount> {
+        // userRegID: only ever the signed-in retailer's own reg no (the server must use the login, not this: reported).
+        val regno = currentUser.get().user.value?.regno ?: return NetworkResult.Failure.Unauthorized
         val text = "text/plain".toMediaType()
         val fields = mapOf(
-            "bankId" to form.bank!!.id,
-            "accno" to form.account.trim(),
-            "ifsccode" to form.ifsc.trim().uppercase(),
-            "holdername" to form.holder.trim().uppercase(),
-            "acctype" to form.owner.api,
+            "userRegID" to regno.toString(),
+            "bankName" to form.bank!!.name,
+            "accountNumber" to form.account.trim(),
+            "ifscCode" to form.ifsc.trim().uppercase(),
+            "accountHolderName" to form.holder.trim().uppercase(),
+            "accountType" to form.owner.api,
         ).mapValues { it.value.toRequestBody(text) }
         fun part(name: String, bytes: ByteArray) = MultipartBody.Part.createFormData(name, "$name.jpg", bytes.toRequestBody("image/jpeg".toMediaType()))
-        val r = safeApiCall(json) { api.addBankAccount(fields, part("panimg", pan), part("passbookimg", passbook)) }
+        val r = safeApiCall(json, allowEmptyData = true) { api.addPayoutBank(fields, part("panImage", pan), part("passbookImage", passbook)) }
         return when (r) {
-            is NetworkResult.Success -> NetworkResult.Success(
-                r.data.toAccount() ?: BankAccount(0, form.bank.name, form.account.takeLast(4), form.holder.trim().uppercase(), form.ifsc.uppercase(), form.owner, verified = false),
-                r.message,
-            )
             is NetworkResult.Failure -> r
+            is NetworkResult.Success -> innerRefusal(r.body())?.let { NetworkResult.Failure.Api(422, "INNER_STATUS", it) }
+                ?: NetworkResult.Success(
+                    BankAccount(0, form.bank.name, form.account.takeLast(4), form.holder.trim().uppercase(), form.ifsc.uppercase(), form.owner, verified = false),
+                    r.message,
+                )
         }
     }
 
-    override suspend fun deleteBank(id: Long) = safeApiCallUnit(json) { api.deleteBankAccount(id) }
+    override suspend fun deleteBank(account: BankAccount): NetworkResult<Unit> {
+        if (account.accountNumber.isBlank()) return NetworkResult.Failure.Unexpected("No account number")
+        return when (val r = safeApiCall(json, allowEmptyData = true) { api.deletePayoutBank(PayoutAccountRequest(account.accountNumber)) }) {
+            is NetworkResult.Failure -> r
+            is NetworkResult.Success -> innerRefusal(r.body())?.let { NetworkResult.Failure.Api(422, "INNER_STATUS", it) } ?: NetworkResult.Success(Unit, r.message)
+        }
+    }
 
     companion object {
         const val RECENT = 3
@@ -272,6 +288,8 @@ class WalletRepositoryImpl @Inject constructor(
         /** Used only if the server sends no limits; the server checks again either way. */
         val DEFAULT_ADD_LIMITS = Limits(BigDecimal(500), BigDecimal(2000))
         val DEFAULT_SEND_LIMITS = Limits(BigDecimal(10), BigDecimal(50000))
+        /** The payout API's paymentMode values (like DMT): IMPS first (instant). */
+        val PAYOUT_MODES = listOf("IMPS", "NEFT")
         private val STATUS_QUERY = mapOf(FundStatus.Pending to "pending", FundStatus.Approved to "transferred", FundStatus.Declined to "declined")
     }
 }
@@ -363,31 +381,14 @@ internal fun refOf(data: JsonElement): String? {
         ?.let { if (it.all(Char::isDigit)) "FR-$it" else it }
 }
 
-internal fun SendAccountDto.toSend(): SendAccount? {
-    val id = id?.contentOrNull?.trim()?.ifEmpty { null } ?: return null
-    return SendAccount(
-        id = id, bankName = bankName?.trim()?.ifEmpty { null } ?: "Bank",
-        accountLast4 = accno?.filter(Char::isLetterOrDigit)?.takeLast(4).orEmpty(),
-        holder = holdername?.trim().orEmpty(), ifsc = ifsccode?.trim()?.uppercase().orEmpty(),
-    )
-}
-
-internal fun BankAccountDto.toAccount(): BankAccount? {
-    val id = id ?: return null
-    return BankAccount(
-        id = id, bankName = (bankName ?: bank_name)?.trim()?.ifEmpty { null } ?: "Bank",
-        accountLast4 = (accountNo ?: accno)?.filter(Char::isLetterOrDigit)?.takeLast(4).orEmpty(),
-        holder = (holderName ?: holdername)?.trim().orEmpty(), ifsc = (ifscCode ?: ifsccode)?.trim()?.uppercase().orEmpty(),
-        owner = if ((accountType ?: acctype)?.trim() == AccountOwner.Relative.api) AccountOwner.Relative else AccountOwner.Self,
-        verified = isVerified ?: is_verified ?: false,
-    )
-}
-
 /**
  * Reads the PayU CheckoutPro fields from the Add money response. The backend is adding them; this accepts the
  * fields either flat or inside `payu` / `payuParams` / `sdkParams`. Without `key`, `txnid` and `hash` the order
  * can't be opened, so it is [OrderResult.NotSupportedYet] and nothing is charged.
  */
+/** What the top-up is for, sent with every PayU initiate (fixed; never user text). */
+internal const val PAYMENT_PURPOSE = "ASL Wallet Topup"
+
 internal object PayUFields {
     private val NESTED = listOf("payu", "payuParams", "sdkParams", "payuPaymentParams")
     val REQUIRED = listOf("key", "txnid", "amount", "productinfo", "firstname", "email", "surl", "furl", "hash")
@@ -396,6 +397,72 @@ internal object PayUFields {
         val src = NESTED.firstNotNullOfOrNull { runCatching { data[it]?.jsonObject }.getOrNull() } ?: data
         val params = src.mapNotNull { (k, v) -> (v as? JsonPrimitive)?.contentOrNull?.let { k to it } }.toMap()
         if (REQUIRED.any { params[it].isNullOrBlank() }) return OrderResult.NotSupportedYet
-        return OrderResult.Ready(PayUOrder(params.getValue("txnid"), params["amount"]?.toBigDecimalOrNull() ?: amount, params))
+        // The status API is GET payments/payu/{clientTxnId}/status (backend collection); clientTxnId sits beside the payu fields.
+        val clientTxnId = listOf(data, src).firstNotNullOfOrNull { (it["clientTxnId"] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank) }
+        val txnid = params.getValue("txnid")
+        return OrderResult.Ready(PayUOrder(txnid, params["amount"]?.toBigDecimalOrNull() ?: amount, params, statusId = clientTxnId ?: txnid))
+    }
+}
+
+// ---------------------------------------------------------------- payout collection readers (internal for tests)
+
+/** With allowEmptyData a success may carry no data (Unit placeholder): read it as JSON only when it is JSON. */
+private fun NetworkResult.Success<JsonElement>.body(): JsonElement? = (data as Any?) as? JsonElement
+
+private fun JsonObject.text(vararg keys: String): String? =
+    keys.firstNotNullOfOrNull { k -> (this[k] as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() && it != "-" && !it.equals("null", true) } }
+
+private fun JsonElement?.rows(): List<JsonObject> = when (this) {
+    is kotlinx.serialization.json.JsonArray -> mapNotNull { it as? JsonObject }
+    is JsonObject -> ((this["banks"] ?: this["data"] ?: this["accounts"]) as? kotlinx.serialization.json.JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
+    else -> emptyList()
+}
+
+/**
+ * payout-bank-list (UAT 10 Nov 2026): `[{id, accno (full), ifsccode, holdername, acctype, isverify "ZERO"/"ONE",
+ * status "ONE", bankName}]`. Inactive rows are left out.
+ */
+internal fun readPayoutBanks(e: JsonElement?): List<BankAccount> = e.rows().mapNotNull { o ->
+    if ((o["status"] as? JsonPrimitive).flag() == false) return@mapNotNull null
+    val id = o.text("id")?.toLongOrNull() ?: return@mapNotNull null
+    val acc = o.text("accno", "accountNumber", "account_number")?.filter(Char::isLetterOrDigit) ?: return@mapNotNull null
+    BankAccount(
+        id = id,
+        bankName = o.text("bankName", "bank_name") ?: "Bank",
+        accountLast4 = acc.takeLast(4),
+        holder = o.text("holdername", "accountHolderName", "holderName").orEmpty(),
+        ifsc = o.text("ifsccode", "ifscCode")?.uppercase().orEmpty(),
+        owner = if (o.text("acctype", "accountType") == AccountOwner.Relative.api) AccountOwner.Relative else AccountOwner.Self,
+        verified = ((o["isverify"] ?: o["isVerified"] ?: o["is_verified"]) as? JsonPrimitive).flag() ?: false,
+        // Only a full (unmasked) number can name the account to the server.
+        accountNumber = acc.takeIf { it.all(Char::isDigit) }.orEmpty(),
+    )
+}
+
+/** An answer whose inner `status` is false: the server's message. */
+internal fun innerRefusal(e: JsonElement?): String? {
+    val o = e as? JsonObject ?: return null
+    if ((o["status"] as? JsonPrimitive)?.booleanOrNull != false) return null
+    return o.text("message", "msg") ?: "The request was not completed."
+}
+
+/** payout answer: the status word decides; anything unclear is Pending (never "sent" by guess). */
+internal fun readPayoutResult(e: JsonElement?, account: SendAccount, amount: BigDecimal, mode: String): SendOutcome {
+    val top = e as? JsonObject ?: return SendOutcome.Pending(null)
+    val o = (top["data"] as? JsonObject) ?: top
+    val receipt = SendReceipt(
+        amount = (o["amount"] as? JsonPrimitive).amount() ?: amount, charge = (o["charge"] as? JsonPrimitive ?: o["serviceCharge"] as? JsonPrimitive).amount(),
+        totalDebited = (o["totalDebited"] as? JsonPrimitive).amount(),
+        holder = o.text("beneficiaryName", "holdername") ?: account.holder, bankName = o.text("bankName") ?: account.bankName,
+        accountLast4 = account.accountLast4, mode = o.text("paymentMode", "paytype", "tranMode") ?: mode,
+        bankRef = o.text("utr", "bankRrn", "rrn", "refno"), txnId = o.text("servid", "txnId", "orderId", "transactionId"), time = "",
+    )
+    innerRefusal(top)?.let { return SendOutcome.Failed(it) }
+    innerRefusal(o)?.let { return SendOutcome.Failed(it) }
+    val word = o.text("tranStatus", "txnStatus", "txnstatus", "payoutStatus") ?: (o["status"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+    return when (word?.uppercase()?.replace(" ", "")) {
+        "SUCCESS", "SUCCESSFUL", "COMPLETED" -> SendOutcome.Sent(receipt)
+        "FAILED", "FAILURE", "DECLINED", "REJECTED" -> SendOutcome.Failed(o.text("message", "remark"))
+        else -> SendOutcome.Pending(receipt)
     }
 }

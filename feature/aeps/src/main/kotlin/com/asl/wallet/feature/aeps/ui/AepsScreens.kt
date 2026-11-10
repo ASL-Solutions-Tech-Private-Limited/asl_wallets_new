@@ -1,5 +1,27 @@
 package com.asl.wallet.feature.aeps.ui
 
+import com.asl.wallet.core.designsystem.theme.accentFill
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
+import com.asl.wallet.core.designsystem.R as DS
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.CircleShape
+import com.asl.wallet.core.designsystem.component.pressScale
+import com.asl.wallet.core.designsystem.component.popIn
+import com.asl.wallet.core.designsystem.component.keyboardAware
+import androidx.compose.foundation.layout.imePadding
 import android.Manifest
 import android.app.Activity
 import android.content.Context
@@ -78,6 +100,8 @@ import com.asl.wallet.core.designsystem.component.ListCard
 import com.asl.wallet.core.designsystem.component.ListRow
 import com.asl.wallet.core.designsystem.component.OtpInput
 import com.asl.wallet.core.designsystem.component.PassbookTable
+import com.asl.wallet.core.designsystem.component.BillLabels
+import com.asl.wallet.core.designsystem.component.BillReceipt
 import com.asl.wallet.core.designsystem.component.ReceiptActionBar
 import com.asl.wallet.core.designsystem.component.ReceiptCard
 import com.asl.wallet.core.designsystem.component.SectionHeader
@@ -122,7 +146,7 @@ private fun AepsScaffold(
 ) {
     val c = AslTheme.colors
     SecureScreen()
-    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding()) {
+    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding().keyboardAware()) {
         AslTopBar(title, onBack = onBack, actions = { right?.invoke() })
         Column(
             Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 16.dp).then(if (bottom == null) Modifier.navigationBarsPadding() else Modifier),
@@ -190,7 +214,7 @@ private fun ScannerChip(device: RdDevice?, onClick: () -> Unit) {
 private fun ScannerSheet(devices: List<RdDevice>, selected: RdDevice?, onSelect: (RdDevice) -> Unit, onDismiss: () -> Unit) {
     val context = LocalContext.current
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = AslTheme.colors.surface, shape = AslShapes.sheet) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp).padding(bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.fillMaxWidth().imePadding().navigationBarsPadding().padding(horizontal = 20.dp).padding(bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(R.string.ae_scanner), style = AslTheme.type.title, color = AslTheme.colors.textPrimary)
             ListCard {
                 devices.forEachIndexed { i, d ->
@@ -222,7 +246,7 @@ fun AepsBankChooserSheet(onChosen: (AepsProvider) -> Unit, onDismiss: () -> Unit
     val s by vm.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { vm.load() }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = AslTheme.colors.surface, shape = AslShapes.sheet) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp).padding(bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.fillMaxWidth().imePadding().navigationBarsPadding().padding(horizontal = 20.dp).padding(bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(R.string.ae_choose), style = AslTheme.type.title, color = AslTheme.colors.textPrimary, modifier = Modifier.semantics { heading() })
             s.error?.let { e ->
                 AlertBanner(AlertKind.Error, uiErrorText(e))
@@ -404,7 +428,9 @@ private fun DetailsForm(f: OnboardingForm, errors: Set<Field>, edit: ((Onboardin
     field(f.dob, R.string.ae_f_dob, Field.Dob, KeyboardType.Number, 10) { { copy(dob = formatDob(it)) } }
     field(f.email, R.string.ae_f_email, Field.Email, KeyboardType.Email, 100) { { copy(email = it.trim()) } }
     field(f.phone, R.string.ae_f_mobile, Field.Phone, KeyboardType.Phone, 10) { { copy(phone = it.filter(Char::isDigit)) } }
-    field(f.aadhaar, R.string.ae_f_aadhaar, Field.Aadhaar, KeyboardType.NumberPassword, 12, password = true) { { copy(aadhaar = it.filter(Char::isDigit)) } }
+    AslTextField(f.aadhaar, { v -> edit { it.copy(aadhaar = v.filter(Char::isDigit)) } }, stringResource(R.string.ae_f_aadhaar),
+        error = if (Field.Aadhaar in errors) bad else null, keyboardType = KeyboardType.Number, maxLength = 12,
+        display = com.asl.wallet.core.designsystem.component.GroupedDigits(), large = true)
     field(f.pan, R.string.ae_f_pan, Field.Pan, max = 10) { { copy(pan = it.uppercase().filter(Char::isLetterOrDigit)) } }
     field(f.address, R.string.ae_f_address, Field.Address, max = 200) { { copy(address = it) } }
     field(f.city, R.string.ae_f_city, Field.City, max = 50) { { copy(city = it) } }
@@ -544,24 +570,34 @@ fun AepsTransactionScreen(
         TxnPhase.Form -> AepsScaffold(title, onBack, right = { ScannerChip(device) { showScanner = true } }, bottom = {
             AslPrimaryButton(stringResource(R.string.ae_scan_customer), { if (vm.onScanPressed()) scan() }, loading = s.busy, icon = AslIcons.Fingerprint)
         }) {
-            SegmentedControl(s.types.map { typeLabel(it) }, s.types.indexOf(s.type), { vm.selectType(s.types[it]) })
-            if (s.type == TxnType.Deposit) AlertBanner(AlertKind.Pending, stringResource(R.string.ae_wallet_note), message = stringResource(R.string.ae_wallet_note_sub), icon = AslIcons.Wallet)
-            AslTextField(s.aadhaar, vm::onAadhaar, stringResource(R.string.ae_c_aadhaar), keyboardType = KeyboardType.NumberPassword, maxLength = 12, password = true,
-                error = if (s.showErrors && !s.aadhaarOk) stringResource(R.string.ae_aadhaar_bad) else null)
+            StepsStrip(Modifier.popIn(0, rise = 8.dp))
+            TypeTiles(s.types, s.type, vm::selectType, Modifier.popIn(40, rise = 10.dp))
+            androidx.compose.animation.AnimatedVisibility(s.type == TxnType.Deposit, enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
+                exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically()) {
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(AslTheme.colors.pendingBg).padding(horizontal = 10.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(AslIcons.Wallet, null, tint = AslTheme.colors.pending, modifier = Modifier.size(15.dp))
+                    Text(stringResource(R.string.ae_wallet_note_sub), style = AslTheme.type.caption, color = AslTheme.colors.pending)
+                }
+            }
+            // Shown in full as 1234 5678 1234 (user, 10 Nov 2026) so it can be checked with the customer; the screen blocks screenshots.
+            AslTextField(s.aadhaar, vm::onAadhaar, stringResource(R.string.ae_c_aadhaar), keyboardType = KeyboardType.Number, maxLength = 12,
+                display = com.asl.wallet.core.designsystem.component.GroupedDigits(), large = true,
+                leadingIcon = AslIcons.Aadhaar, error = if (s.showErrors && !s.aadhaarOk) stringResource(R.string.ae_aadhaar_bad) else null, modifier = Modifier.popIn(80, rise = 10.dp))
             AslTextField(s.mobile, vm::onMobile, stringResource(R.string.ae_c_mobile), keyboardType = KeyboardType.Phone, maxLength = 10,
-                error = if (s.showErrors && !s.mobileOk) stringResource(R.string.ae_mobile_bad) else null)
-            SectionHeader(stringResource(R.string.ae_c_bank))
-            val chips = (listOfNotNull(s.bank) + s.recentBanks).distinctBy { it.iin }.take(3)
-            ChoiceChips(chips.map { shortBank(it.name) } + stringResource(R.string.ae_more_banks), chips.indexOfFirst { it == s.bank }.takeIf { it >= 0 }, { i ->
-                if (i < chips.size) vm.onBank(chips[i]) else showBanks = true
-            })
-            if (s.showErrors && s.bank == null) Text(stringResource(R.string.ae_bank_needed), style = AslTheme.type.caption, color = AslTheme.colors.error)
-            s.bank?.let { Text(it.name, style = AslTheme.type.caption, color = AslTheme.colors.textSecondary) }
+                error = if (s.showErrors && !s.mobileOk) stringResource(R.string.ae_mobile_bad) else null, modifier = Modifier.popIn(110, rise = 10.dp))
+            BankCard(s.bank, error = s.showErrors && s.bank == null, onClick = { showBanks = true }, modifier = Modifier.popIn(140, rise = 10.dp))
+            val chips = s.recentBanks.filter { it != s.bank }.take(3)
+            if (chips.isNotEmpty()) ChoiceChips(chips.map { shortBank(it.name) }, null, { i -> vm.onBank(chips[i]) })
+            ConsentRow(s.consent, vm::onConsent, error = s.showErrors && !s.consent)
             if (s.type.needsAmount) {
-                AslTextField(s.amountText, vm::onAmount, stringResource(R.string.ae_amount), keyboardType = KeyboardType.Number, maxLength = 5,
-                    error = if (s.showErrors && !s.amountOk) stringResource(R.string.ae_amount_rule) else null)
-                AmountShow(s.amount)
-                ChoiceChips(s.quickAmounts.map { Money.format(java.math.BigDecimal(it), showPaise = false) }, s.quickAmounts.indexOfFirst { s.amount?.toLong() == it }.takeIf { it >= 0 }, { vm.onQuick(s.quickAmounts[it]) })
+                AmountBox(
+                    s.amountText, s.amount, vm::onAmount,
+                    ask = stringResource(if (s.type == TxnType.Deposit) R.string.ae_ask_deposit else R.string.ae_ask_withdraw),
+                    error = if (s.showErrors && !s.amountOk) stringResource(R.string.ae_amount_rule) else null,
+                    modifier = Modifier.popIn(170, rise = 10.dp),
+                )
+                QuickChips(s.quickAmounts, s.amount, vm::onQuick)
             }
             ErrorBanner(s.error, null)
             LocationLine()
@@ -599,7 +635,7 @@ private fun BankPicker(all: List<CustomerBank>, popular: List<CustomerBank>, onP
     var q by rememberSaveable { mutableStateOf("") }
     val results = remember(q, all) { AepsTransactionViewModel.search(all, q) }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = AslTheme.colors.surface, shape = AslShapes.sheet) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.fillMaxWidth().imePadding().navigationBarsPadding().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             AslTextField(q, { q = it.take(40) }, stringResource(R.string.ae_search_bank), trailingIcon = AslIcons.Search)
             if (q.isBlank() && popular.isNotEmpty()) {
                 SectionHeader(stringResource(R.string.ae_recent))
@@ -647,6 +683,7 @@ private fun ResultScreen(
                     shop, typeLabel(r.type), r.amount?.let { Money.format(it) } ?: (r.bankBalance?.let { "₹ $it" } ?: ""), Status.Success,
                     doc.rows.map { KeyValue(it.first, it.second) }, footer = doc.footer, statusLabel = stringResource(R.string.ae_success),
                     amountWords = r.amount?.takeIf { it.signum() > 0 }?.let { AmountInWords.english(it) }, animate = true,
+                    voice = aepsVoice(r),
                 )
                 if (r.type == TxnType.Statement) {
                     SectionHeader(stringResource(R.string.ae_statement))
@@ -670,25 +707,23 @@ private fun ResultScreen(
                 context.findActivity()?.let { ReceiptExport.print(it, shareTitle, ReceiptExport.html(shop, doc, thermal), thermal) }
             }
         }
+        // Failed / Pending print the same bill as Reports (stamped), built from what was entered: no money moved
+        // (failed) or the bank hasn't answered (pending).
         is TxnOutcome.Failed -> AepsScaffold(stringResource(R.string.ae_receipt), onHome, bottom = {
             AslPrimaryButton(stringResource(R.string.ae_try_finger), again, icon = AslIcons.Fingerprint)
             AslButton(stringResource(R.string.ae_back_aeps), again, Modifier.fillMaxWidth(), style = AslButtonStyle.Outline)
         }) {
-            StateView(AslIcons.Close, StatePresets.errorColors, stringResource(R.string.ae_failed), o.reason ?: stringResource(R.string.ae_failed_default))
-            AslCard { KeyValueList(listOfNotNull(
-                KeyValue(stringResource(R.string.ae_r_aadhaar), Masking.aadhaar(s.aadhaar)),
-                s.amount?.takeIf { s.type.needsAmount }?.let { KeyValue(stringResource(R.string.ae_amount), Money.format(it) + " · " + stringResource(R.string.ae_not_debited)) },
-            )) }
+            AttemptBill(s, shop, Status.Failed, stringResource(R.string.ae_s_failed), onCall, listOfNotNull(
+                s.amount?.takeIf { s.type.needsAmount }?.let { stringResource(R.string.ae_amount) to stringResource(R.string.ae_not_debited) },
+                stringResource(R.string.ae_reason) to (o.reason ?: stringResource(R.string.ae_failed_default)),
+            ))
         }
         TxnOutcome.Pending -> AepsScaffold(stringResource(R.string.ae_receipt), onHome, bottom = {
             AslPrimaryButton(stringResource(R.string.ae_home), onHome, icon = AslIcons.Home)
         }) {
-            StateView(AslIcons.Clock, StatePresets.warnColors, stringResource(R.string.ae_pending), stringResource(R.string.ae_pending_sub))
-            AslCard { KeyValueList(listOfNotNull(
-                s.amount?.takeIf { s.type.needsAmount }?.let { KeyValue(stringResource(R.string.ae_amount), Money.format(it)) },
-                KeyValue(stringResource(R.string.ae_r_aadhaar), Masking.aadhaar(s.aadhaar)),
-                KeyValue(stringResource(R.string.ae_status), stringResource(R.string.ae_status_unknown)),
-            )) }
+            AttemptBill(s, shop, Status.Pending, stringResource(R.string.ae_s_pending), onCall, listOf(
+                stringResource(R.string.ae_status) to stringResource(R.string.ae_status_unknown),
+            ))
             AlertBanner(AlertKind.Pending, stringResource(R.string.ae_pending_msg))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AslButton(stringResource(R.string.ae_help_call), onCall, Modifier.weight(1f), style = AslButtonStyle.Outline, icon = AslIcons.Phone)
@@ -704,11 +739,36 @@ private fun ResultScreen(
     }
 }
 
+/** The bill for a transaction that didn't succeed: the customer's details as entered (masked), stamped [status]. */
+@Composable
+private fun AttemptBill(s: TxnState, shop: ShopInfo, status: Status, word: String, onCall: () -> Unit, extra: List<Pair<String, String>>) {
+    val doc = ReceiptDoc(
+        title = typeLabel(s.type),
+        status = word,
+        amount = s.amount?.takeIf { s.type.needsAmount }?.let { Money.format(it) },
+        rows = listOfNotNull(
+            stringResource(R.string.ae_r_aadhaar) to Masking.aadhaar(s.aadhaar),
+            s.mobile.takeIf { it.isNotBlank() }?.let { stringResource(R.string.ae_r_mobile) to Masking.mobile(it) },
+            s.bank?.let { stringResource(R.string.ae_r_bank) to it.name },
+            stringResource(R.string.ae_r_via) to "AEPS · ${s.provider.displayName}",
+        ) + extra,
+        footer = stringResource(R.string.ae_r_note),
+    )
+    BillReceipt(
+        shop, doc, status,
+        BillLabels(
+            listOf(stringResource(R.string.ae_share), stringResource(R.string.ae_pdf), stringResource(R.string.ae_print), stringResource(R.string.ae_help_call)),
+            stringResource(R.string.ae_receipt_share_title), stringResource(R.string.ae_print_title), stringResource(R.string.ae_print_thermal), stringResource(R.string.ae_print_a4),
+        ),
+        fileName = "ASL-AEPS-receipt.pdf", onHelp = onCall,
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PrintChoiceSheet(onDismiss: () -> Unit, onChoose: (thermal: Boolean) -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = AslTheme.colors.surface, shape = AslShapes.sheet) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp).padding(bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.fillMaxWidth().imePadding().navigationBarsPadding().padding(horizontal = 20.dp).padding(bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(R.string.ae_print_title), style = AslTheme.type.title, color = AslTheme.colors.textPrimary)
             ListCard {
                 ListRow(stringResource(R.string.ae_print_thermal), icon = AslIcons.Print, onClick = { onChoose(true) }); Divider()
@@ -758,4 +818,197 @@ fun AepsSetupRow(onClick: () -> Unit, vm: AepsChooserViewModel = hiltViewModel()
             onClick = onClick,
         )
     }
+}
+
+// ---------------------------------------------------------------- transaction form pieces (classic look, 10 Nov 2026)
+
+/** Fill details → customer scans finger → receipt. */
+@Composable
+private fun StepsStrip(modifier: Modifier) {
+    val c = AslTheme.colors
+    val steps = listOf(R.string.ae_step_fill, R.string.ae_step_scan, R.string.ae_step_receipt)
+    Row(modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.tint).padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        steps.forEachIndexed { i, r ->
+            Box(Modifier.size(18.dp).clip(CircleShape).background(if (i == 0) c.accentFill else c.surface), contentAlignment = Alignment.Center) {
+                Text("${i + 1}", style = AslTheme.type.micro, color = if (i == 0) Color.White else c.primary)
+            }
+            Text(stringResource(r), style = AslTheme.type.micro, color = c.primary, modifier = Modifier.padding(start = 5.dp), maxLines = 1)
+            if (i < steps.lastIndex) Box(Modifier.weight(1f).padding(horizontal = 6.dp).height(1.dp).background(c.primary.copy(alpha = 0.25f)))
+        }
+    }
+}
+
+/** The AEPS services in one row: the old app's icon and the name; the chosen one lifts with a small check. */
+@Composable
+private fun TypeTiles(types: List<TxnType>, selected: TxnType, onPick: (TxnType) -> Unit, modifier: Modifier) {
+    val c = AslTheme.colors
+    val haptic = LocalHapticFeedback.current
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        types.forEach { t ->
+            val on = t == selected
+            val interaction = remember { MutableInteractionSource() }
+            val lift by animateFloatAsState(if (on) 1.05f else 1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "lift")
+            val ring by animateColorAsState(if (on) c.primary else c.outline, label = "ring")
+            val bg by animateColorAsState(if (on) c.tint else c.surface, label = "bg")
+            val shape = RoundedCornerShape(14.dp)
+            Box(
+                Modifier.weight(1f).graphicsLayer { scaleX = lift; scaleY = lift }.pressScale(interaction, 0.94f)
+                    .shadow(if (on) 5.dp else 0.dp, shape, spotColor = Color(0xFF1976D2)).clip(shape).background(bg).border(if (on) 2.dp else 1.dp, ring, shape)
+                    .clickable(interaction, indication = null, role = Role.RadioButton) { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onPick(t) }
+                    .padding(vertical = 8.dp, horizontal = 4.dp),
+            ) {
+                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    // The old app's line icons are black: on a dark tile they sit on a light circle.
+                    Box(Modifier.size(38.dp).then(if (c.isDark) Modifier.clip(CircleShape).background(Color(0xFFE9F1FB)) else Modifier), contentAlignment = Alignment.Center) {
+                        Image(painterResource(typeIcon(t)), null, Modifier.size(28.dp))
+                    }
+                    Text(typeLabel(t), style = AslTheme.type.micro, color = if (on) c.primary else c.textPrimary, maxLines = 1, textAlign = TextAlign.Center)
+                }
+                androidx.compose.animation.AnimatedVisibility(on, Modifier.align(Alignment.TopEnd),
+                    enter = androidx.compose.animation.scaleIn() + androidx.compose.animation.fadeIn(), exit = androidx.compose.animation.scaleOut() + androidx.compose.animation.fadeOut()) {
+                    Icon(AslIcons.Check, null, tint = Color.White, modifier = Modifier.size(14.dp).clip(CircleShape).background(c.accentFill).padding(2.dp))
+                }
+            }
+        }
+    }
+}
+
+private fun typeIcon(t: TxnType) = when (t) {
+    TxnType.Withdraw -> DS.drawable.classic_ic_cw; TxnType.Balance -> DS.drawable.classic_ic_be
+    TxnType.Statement -> DS.drawable.classic_ic_ms; TxnType.Deposit -> DS.drawable.classic_ic_cd
+}
+
+
+
+/** The customer's bank: initials badge, full name and Change; or a prompt to choose. */
+@Composable
+private fun BankCard(bank: CustomerBank?, error: Boolean, onClick: () -> Unit, modifier: Modifier) {
+    val c = AslTheme.colors
+    val interaction = remember { MutableInteractionSource() }
+    val shape = RoundedCornerShape(16.dp)
+    Column(modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth().pressScale(interaction, 0.97f).clip(shape).background(c.surface).border(if (error) 2.dp else 1.dp, if (error) c.error else c.outline, shape)
+                .clickable(interaction, indication = androidx.compose.material3.ripple(), role = Role.Button, onClick = onClick).padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(Modifier.size(36.dp).clip(CircleShape).background(Brush.linearGradient(AslTheme.colors.headerGradient)), contentAlignment = Alignment.Center) {
+                if (bank == null) Icon(AslIcons.Bank, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                else Text(bankInitials(bank.name), style = AslTheme.type.label, color = Color.White)
+            }
+            Column(Modifier.weight(1f)) {
+                Text(bank?.name ?: stringResource(R.string.ae_pick_bank), style = AslTheme.type.bodyStrong, color = c.textPrimary, maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                Text(stringResource(if (bank == null) R.string.ae_pick_bank_sub else R.string.ae_bank_of_customer), style = AslTheme.type.micro, color = c.textSecondary, maxLines = 1)
+            }
+            Text(stringResource(if (bank == null) R.string.ae_choose_btn else R.string.ae_change), style = AslTheme.type.label, color = c.primary)
+        }
+        if (error) Text(stringResource(R.string.ae_bank_needed), style = AslTheme.type.caption, color = c.error, modifier = Modifier.padding(start = 6.dp, top = 5.dp))
+    }
+}
+
+private fun bankInitials(name: String): String {
+    val n = name.uppercase()
+    listOf("STATE BANK OF INDIA" to "SBI", "PUNJAB NATIONAL BANK" to "PNB", "BANK OF BARODA" to "BOB", "BANK OF INDIA" to "BOI", "HDFC" to "HDFC", "ICICI" to "ICICI", "AXIS" to "AXIS", "KOTAK" to "KMB")
+        .firstOrNull { n.startsWith(it.first) }?.let { return it.second }
+    return n.split(' ').filter { it.isNotBlank() && it !in setOf("OF", "THE", "LTD", "BANK") }.take(3).joinToString("") { it.take(1) }.ifEmpty { "BK" }
+}
+
+/** Big amount you type into, with the amount in words and the ₹100–₹10,000 bar. */
+@Composable
+private fun AmountBox(text: String, amount: java.math.BigDecimal?, onAmount: (String) -> Unit, ask: String, error: String?, modifier: Modifier) {
+    val c = AslTheme.colors
+    var focused by remember { mutableStateOf(false) }
+    val ring by animateColorAsState(if (error != null) c.error else if (focused) c.primaryEnd else c.outline, label = "amtRing")
+    val shape = RoundedCornerShape(18.dp)
+    val lo = TxnState.MIN_AMOUNT.toFloat(); val hi = TxnState.MAX_AMOUNT.toFloat()
+    val fill by animateFloatAsState((amount?.toFloat() ?: 0f).coerceIn(0f, hi) / hi, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow), label = "amtFill")
+    val inRange = amount != null && amount.toFloat() in lo..hi
+    Column(
+        modifier.fillMaxWidth().shadow(if (focused) 6.dp else 1.dp, shape).clip(shape).background(c.surface).border(if (focused || error != null) 2.dp else 1.dp, ring, shape)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Text(ask, style = AslTheme.type.caption, color = c.textSecondary, textAlign = TextAlign.Center)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("₹", style = AslTheme.type.amountWallet, color = if (text.isEmpty()) c.outline else c.primary)
+            Spacer(Modifier.width(6.dp))
+            androidx.compose.foundation.text.BasicTextField(
+                value = text, onValueChange = onAmount, singleLine = true,
+                textStyle = AslTheme.type.amountWallet.copy(color = c.primary),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(c.primaryEnd),
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = androidx.compose.ui.text.input.ImeAction.Done),
+                keyboardActions = com.asl.wallet.core.designsystem.component.rememberImeActions(androidx.compose.ui.text.input.ImeAction.Done),
+                modifier = Modifier.widthIn(min = 28.dp).width(androidx.compose.foundation.layout.IntrinsicSize.Min).onFocusChanged { focused = it.isFocused },
+                decorationBox = { inner -> Box { if (text.isEmpty()) Text("0", style = AslTheme.type.amountWallet, color = c.outline); inner() } },
+            )
+        }
+        Text(amount?.takeIf { it.signum() > 0 }?.let { AmountInWords.english(it) } ?: " ", style = AslTheme.type.caption, color = c.textSecondary, textAlign = TextAlign.Center)
+        Box(Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(50)).background(c.tint)) {
+            Box(Modifier.fillMaxWidth(fill).height(5.dp).clip(RoundedCornerShape(50)).background(if (error != null || (amount != null && !inRange && amount.signum() > 0)) c.error else c.success))
+        }
+        Row(Modifier.fillMaxWidth()) {
+            Text("Min " + Money.format(TxnState.MIN_AMOUNT, showPaise = false), style = AslTheme.type.micro, color = c.textSecondary)
+            Spacer(Modifier.weight(1f))
+            Text("Max " + Money.format(TxnState.MAX_AMOUNT, showPaise = false), style = AslTheme.type.micro, color = c.textSecondary)
+        }
+        if (error != null) Text(error, style = AslTheme.type.caption, color = c.error)
+    }
+}
+
+@Composable
+private fun QuickChips(options: List<Long>, amount: java.math.BigDecimal?, onQuick: (Long) -> Unit) {
+    if (options.isEmpty()) return
+    val c = AslTheme.colors
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.take(4).forEach { v ->
+            val on = amount?.toLong() == v
+            val bg by animateColorAsState(if (on) c.accentFill else c.surface, label = "qbg")
+            val fg by animateColorAsState(if (on) Color.White else c.primary, label = "qfg")
+            Box(
+                Modifier.weight(1f).height(38.dp).clip(RoundedCornerShape(12.dp)).background(bg).border(1.dp, if (on) c.primary else c.outline, RoundedCornerShape(12.dp))
+                    .clickable(role = Role.Button) { onQuick(v) },
+                contentAlignment = Alignment.Center,
+            ) { Text(Money.format(java.math.BigDecimal(v), showPaise = false), style = AslTheme.type.label, color = fg) }
+        }
+    }
+}
+
+/** The customer's Aadhaar consent: ticked by default (as in the old app), with the text one tap away. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ConsentRow(checked: Boolean, onChange: (Boolean) -> Unit, error: Boolean) {
+    val c = AslTheme.colors
+    var read by remember { mutableStateOf(false) }
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(if (error) c.errorBg else c.tint)
+            .clickable(role = Role.Checkbox) { onChange(!checked) }.padding(end = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        androidx.compose.material3.Checkbox(checked, onChange, colors = androidx.compose.material3.CheckboxDefaults.colors(checkedColor = c.accentFill))
+        Text(stringResource(R.string.ae_consent), style = AslTheme.type.caption, color = if (error) c.error else c.textPrimary, modifier = Modifier.weight(1f))
+        Text(stringResource(R.string.ae_consent_read), style = AslTheme.type.label, color = c.primary,
+            modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(role = Role.Button) { read = true }.padding(6.dp))
+    }
+    if (read) ModalBottomSheet(onDismissRequest = { read = false }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = c.surface, shape = AslShapes.sheet) {
+        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp).padding(bottom = 20.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(stringResource(R.string.ae_consent_title), style = AslTheme.type.title, color = c.textPrimary)
+            Text(stringResource(R.string.ae_consent_text), style = AslTheme.type.body, color = c.textSecondary)
+            AslPrimaryButton(stringResource(R.string.ae_consent_ok), { onChange(true); read = false })
+        }
+    }
+}
+
+/** The announcement after an AEPS receipt (old app's TextSpeaker): mode, amount and the available balance. */
+@Composable
+private fun aepsVoice(r: AepsReceipt): String {
+    val amount = r.amount?.takeIf { it.signum() > 0 }?.let { com.asl.wallet.core.designsystem.component.spokenRupees(it) }
+    val balance = r.bankBalance?.replace(",", "")?.trim()?.toBigDecimalOrNull()?.let { com.asl.wallet.core.designsystem.component.spokenRupees(it) }
+    val head = when (r.type) {
+        TxnType.Withdraw -> amount?.let { stringResource(R.string.ae_voice_withdraw, it) }
+        TxnType.Deposit -> amount?.let { stringResource(R.string.ae_voice_deposit, it) }
+        TxnType.Balance -> stringResource(R.string.ae_voice_balance_done)
+        TxnType.Statement -> stringResource(R.string.ae_voice_statement)
+    }
+    return listOfNotNull(head, balance?.let { stringResource(R.string.ae_voice_available, it) }).joinToString(" ")
 }

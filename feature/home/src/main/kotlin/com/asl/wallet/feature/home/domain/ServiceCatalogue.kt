@@ -12,7 +12,7 @@ import java.net.URI
 object ServiceCatalogue {
 
     /** Build modules whose screens exist in this app. A service becomes tappable when its module ships. */
-    val BUILT_MODULES: Set<Int> = setOf(AEPS_MODULE, PAYOUT_MODULE, RECHARGE_MODULE, DMT_MODULE)
+    val BUILT_MODULES: Set<Int> = setOf(AEPS_MODULE, PAYOUT_MODULE, RECHARGE_MODULE, DMT_MODULE, BBPS_MODULE)
 
     /** AEPS (with its own onboarding/eKYC) ships in Module 3. */
     const val AEPS_MODULE = 3
@@ -25,6 +25,12 @@ object ServiceCatalogue {
 
     /** Money transfer (DMT) ships in Module 5B. */
     const val DMT_MODULE = 8
+
+    /** BBPS (Bharat Connect) bill payment: electricity, Fastag, gas, postpaid, loan repayment … (9 Nov 2026). */
+    const val BBPS_MODULE = 10
+
+    /** The single, merged AEPS tile's key. */
+    const val AEPS_KEY = "aeps"
 
     const val MAX_PINNED = 7 // + the fixed "All services" tile = 8
 
@@ -50,17 +56,18 @@ object ServiceCatalogue {
             has(" upi", " qr ", " qr") -> ServiceKind.Upi to 9
             has(" csp ", " bc ", "bank", "kiosk") -> ServiceKind.Bank to null
             has(" dth ") -> ServiceKind.Dth to RECHARGE_MODULE
-            has("postpaid") -> ServiceKind.Mobile to 10
+            has("postpaid") -> ServiceKind.Mobile to BBPS_MODULE
             has("mobile", "recharge", "prepaid") -> ServiceKind.Mobile to RECHARGE_MODULE
-            has("electric", "power") -> ServiceKind.Electricity to 10
-            has("fastag") -> ServiceKind.Fastag to 10
-            has("bbps", "bill", " gas ", "water", "broadband", "landline") -> ServiceKind.Bills to 10
+            has("electric", "power") -> ServiceKind.Electricity to BBPS_MODULE
+            has("fastag") -> ServiceKind.Fastag to BBPS_MODULE
+            has("bbps", "bill", " gas ", " lpg ", "water", "broadband", "landline") -> ServiceKind.Bills to BBPS_MODULE
             has(" lic ", "insurance") -> ServiceKind.Insurance to 11
             has(" pan ", "nsdl", " uti ") -> ServiceKind.Pan to 11
             has("aadhaar", "aadhar") -> ServiceKind.Aadhaar to null
             has("train", "irctc", "flight", " bus ", "hotel", "travel", " air ") -> ServiceKind.Travel to null
             has("gift", "voucher", "google play") -> ServiceKind.Gift to 11
-            has("loan") -> ServiceKind.Other to 11
+            // Loan repayment is a BBPS category (old app's 3rd dashboard).
+            has("loan") -> ServiceKind.Bills to BBPS_MODULE
             else -> ServiceKind.Other to null
         }
     }
@@ -110,8 +117,19 @@ object ServiceCatalogue {
         }
         .sortedWith(compareBy({ it.first }, { it.second.name.lowercase() }))
         .map { it.second }
+        // One AEPS tile, however many banks the server lists ("AEPS (YES BANK)", "AEPS (KOTAK BANK)"):
+        // the AEPS flow asks for the bank itself (old app: one AEPS tile, 10 Nov 2026).
+        .map { if (it.kind == ServiceKind.Aeps && it.destination is ServiceDestination.App) it.copy(key = AEPS_KEY, name = "AEPS", description = null) else it }
         .distinctBy { it.key }
         .toList()
+
+    /**
+     * Payout (send to the retailer's own bank) is a wallet feature every retailer has, but the server's service list
+     * doesn't name it (UAT, 9 Nov 2026): it is added after the server's services when missing.
+     */
+    fun withWalletServices(list: List<HomeService>, built: Set<Int> = BUILT_MODULES): List<HomeService> =
+        if (list.any { it.destination == ServiceDestination.App(PAYOUT_MODULE) }) list
+        else list + fromServer(listOf(ServiceDto(id = -1, services_name = "Payout", service_order = Int.MAX_VALUE)), built)
 
     /** Used when `merchant/services` fails or is empty. No partner URLs are invented here. */
     fun fallback(built: Set<Int> = BUILT_MODULES): List<HomeService> = fromServer(

@@ -107,4 +107,6 @@
     <string name="r_offline">ইন্টারনেট নেই। সংযোগ দেখে আবার চেষ্টা করুন।</string>
     <string name="r_timeout">সার্ভার অনেক সময় নিয়েছে। আবার চেষ্টা করুন।</string>
     <string name="r_generic">কিছু ভুল হয়েছে। আবার চেষ্টা করুন।</string>
+    <!-- Voice after the receipt -->
+    <string name="r_voice">%1$s রিচার্জ %2$s টাকা সফল।</string>
 </resources>

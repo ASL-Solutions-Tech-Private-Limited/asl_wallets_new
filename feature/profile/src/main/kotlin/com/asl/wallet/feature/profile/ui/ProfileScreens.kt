@@ -202,10 +202,6 @@ fun ProfileTab(
                     ) { Text(s.data.initials, style = AslTheme.type.title, color = c.brandNavy) }
                     Text(s.data.name.uppercase(), style = AslTheme.type.bodyStrong, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        listOfNotNull(s.data.shopName.ifBlank { null }, s.data.regno?.let { "R-$it" }).joinToString(" · "),
-                        style = AslTheme.type.caption, color = Color.White.copy(alpha = 0.8f), textAlign = TextAlign.Center,
-                    )
-                    Text(
                         stringResource(if (isDistributor) R.string.pf_distributor else R.string.pf_retailer), style = AslTheme.type.micro, color = Color.White,
                         modifier = Modifier.background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 3.dp),
                     )
@@ -238,14 +234,35 @@ fun ProfileTab(
         Text(stringResource(R.string.pf_version, versionName), style = AslTheme.type.caption, color = c.textSecondary, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
     }
     }
-    if (confirm) {
-        AlertDialog(
-            onDismissRequest = { confirm = false },
-            title = { Text(stringResource(R.string.pf_logout_title)) },
-            text = { Text(stringResource(R.string.pf_logout_msg)) },
-            confirmButton = { TextButton({ confirm = false; vm.logout() }) { Text(stringResource(R.string.pf_logout), color = AslTheme.colors.error) } },
-            dismissButton = { TextButton({ confirm = false }) { Text(stringResource(R.string.pf_cancel)) } },
-        )
+    if (confirm) LogoutSheet(
+        name = (state as? Loadable.Ready)?.data?.name,
+        onConfirm = { confirm = false; vm.logout() },
+        onDismiss = { confirm = false },
+    )
+}
+
+/** Branded, animated log-out confirmation: a bottom sheet with a danger icon, a clear choice, and no accidental taps. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LogoutSheet(name: String?, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val c = AslTheme.colors
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = c.surface) {
+        Column(
+            Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 24.dp).padding(top = 4.dp, bottom = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(13.dp),
+        ) {
+            BigIcon(AslIcons.Alert, listOf(Color(0xFFF2555A), Color(0xFFC42A2A)), size = 70.dp)
+            Text(stringResource(R.string.pf_logout_title), style = AslTheme.type.title, color = c.textPrimary, textAlign = TextAlign.Center)
+            Text(
+                name?.trim()?.takeIf { it.isNotEmpty() }?.let { stringResource(R.string.pf_logout_msg_named, it) }
+                    ?: stringResource(R.string.pf_logout_msg),
+                style = AslTheme.type.body, color = c.textSecondary, textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(4.dp))
+            AslButton(stringResource(R.string.pf_logout_confirm), onConfirm, Modifier.fillMaxWidth(), style = AslButtonStyle.Danger)
+            AslButton(stringResource(R.string.pf_logout_stay), onDismiss, Modifier.fillMaxWidth(), style = AslButtonStyle.Outline)
+        }
     }
 }
 

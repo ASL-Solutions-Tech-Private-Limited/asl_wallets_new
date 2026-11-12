@@ -152,7 +152,12 @@ fun AslTextField(
             cursorBrush = SolidColor(c.primaryEnd),
             visualTransformation = if (password && !reveal) PasswordVisualTransformation() else display ?: VisualTransformation.None,
             keyboardOptions = KeyboardOptions(
-                keyboardType = if (password) KeyboardType.Password else keyboardType,
+                // A password field keeps a number pad when its content is numeric (e.g. a masked account number).
+                keyboardType = when {
+                    password && (keyboardType == KeyboardType.Number || keyboardType == KeyboardType.NumberPassword || keyboardType == KeyboardType.Phone) -> KeyboardType.NumberPassword
+                    password -> KeyboardType.Password
+                    else -> keyboardType
+                },
                 imeAction = imeAction,
                 autoCorrectEnabled = false,
             ),

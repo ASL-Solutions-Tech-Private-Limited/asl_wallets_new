@@ -167,22 +167,26 @@ data class WalletCardLabels(
     val balanceIs: (String) -> String = { "Balance $it" },
 )
 
-/** Big amount in gradient text, the amount in words underneath, and optional quick-amount chips. */
+/**
+ * Big amount in gradient text, the amount in words underneath, and optional quick-amount chips.
+ * [compact] keeps the same look but smaller (tighter card, headline-size amount) so it takes less vertical space.
+ */
 @Composable
 fun AmountCard(
     amount: BigDecimal?,
     modifier: Modifier = Modifier,
     quickAmounts: List<Long> = emptyList(),
     selectedQuick: Long? = null,
+    compact: Boolean = false,
     onQuickSelect: (Long) -> Unit = {},
 ) {
     val c = AslTheme.colors
-    AslCard(modifier) {
-        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    AslCard(modifier, padding = if (compact) 10.dp else 14.dp) {
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 4.dp)) {
             val text = amount?.let { Money.format(it, showPaise = false) } ?: "₹ 0"
             Text(
                 text,
-                style = AslTheme.type.amountDisplay.merge(TextStyle(brush = Brush.linearGradient(AslGradients.action))),
+                style = (if (compact) AslTheme.type.headline else AslTheme.type.amountDisplay).merge(TextStyle(brush = Brush.linearGradient(AslGradients.action))),
                 textAlign = TextAlign.Center,
             )
             Text(amount?.let { AmountInWords.english(it) } ?: "Enter an amount", style = AslTheme.type.caption, color = c.textSecondary, textAlign = TextAlign.Center)

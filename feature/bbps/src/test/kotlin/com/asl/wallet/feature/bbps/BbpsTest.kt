@@ -188,6 +188,14 @@ class BbpsRepositoryTest {
         val g = repo.pay(payment()) as BbpsOutcome.Failed
         assertThat(g.debited).isFalse()
     }
+
+    @Test fun `a free-text rejection with no settlement id is Failed and not debited, never a misleading Pending`() = runTest {
+        // Real UAT FASTag response: HTTP 200, status 200, the reason in txnstatus/message, empty apiTrnID, balance unchanged.
+        respond(200, """{"status":200,"apiTrnID":"","resApiTxnId":"","txnstatus":"The minimum allowed amount for FASTag recharges is Rs. 100","message":"The minimum allowed amount for FASTag recharges is Rs. 100","ref_id":"WR0N","amount":1,"ca_number":"WB18P6832","updated_user_balance":"673.99"}""")
+        val f = repo.pay(payment()) as BbpsOutcome.Failed
+        assertThat(f.debited).isFalse()
+        assertThat(f.reason).contains("minimum allowed amount")
+    }
 }
 
 class BbpsViewModelTest {

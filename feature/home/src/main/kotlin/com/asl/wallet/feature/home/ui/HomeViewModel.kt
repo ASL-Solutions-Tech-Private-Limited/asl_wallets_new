@@ -20,7 +20,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -89,7 +88,6 @@ class HomeViewModel @Inject constructor(
     val events = _events.receiveAsFlow()
 
     private var savedPins: List<String>? = null
-    private var hideJob: Job? = null
     private var refreshJob: Job? = null
 
     init {
@@ -138,8 +136,6 @@ class HomeViewModel @Inject constructor(
                     is NetworkResult.Failure -> s.copy(walletError = s.wallet == null, offline = offline, loading = false)
                 }
             }
-            if (w is NetworkResult.Success && !_state.value.balanceHidden) scheduleAutoHide()
-
             val r = recent.await()
             _state.update { s ->
                 when (r) {
@@ -151,20 +147,8 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun toggleBalance() {
-        val hide = !_state.value.balanceHidden
-        _state.update { it.copy(balanceHidden = hide) }
-        if (hide) hideJob?.cancel() else scheduleAutoHide()
-    }
-
-    /** The balance hides itself 10 s after it was shown, so it isn't left on screen at the counter. */
-    private fun scheduleAutoHide() {
-        hideJob?.cancel()
-        hideJob = viewModelScope.launch {
-            delay(AUTO_HIDE_MS)
-            _state.update { it.copy(balanceHidden = true) }
-        }
-    }
+    /** Balance shows by default (client request) and stays shown until the retailer hides it — no auto-hide. */
+    fun toggleBalance() = _state.update { it.copy(balanceHidden = !it.balanceHidden) }
 
     fun onServiceClick(service: HomeService) {
         val sheet: ServiceSheet? = when (val d = service.destination) {
@@ -243,5 +227,4 @@ class HomeViewModel @Inject constructor(
 
     private fun repin() = _state.update { it.copy(pinned = ServiceCatalogue.pinned(it.services, savedPins)) }
 
-    companion object { const val AUTO_HIDE_MS = 10_000L }
 }

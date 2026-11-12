@@ -5,6 +5,17 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+    // Firebase plugins are applied below only when google-services.json is present, so the project
+    // still builds before the JSON is added. See the apply block after the android { } config.
+}
+
+// Firebase (Analytics, Crashlytics, Cloud Messaging) turns on only once google-services.json is dropped into app/.
+// Until then the plugins are skipped and the app builds and runs normally (Firebase init is also guarded at runtime).
+val hasGoogleServices = file("google-services.json").exists() ||
+    file("src/live/google-services.json").exists() || file("src/uat/google-services.json").exists()
+if (hasGoogleServices) {
+    apply(plugin = libs.plugins.google.services.get().pluginId)
+    apply(plugin = libs.plugins.firebase.crashlytics.get().pluginId)
 }
 
 // UAT pins: server key, Let's Encrypt YR1 intermediate, ISRG Root YR, ISRG Root X1/X2 (backups so a renewal can't lock users out).
@@ -28,7 +39,8 @@ android {
     compileSdk { version = release(37) }
 
     defaultConfig {
-        applicationId = "com.asl.wallet.app"
+        // Ships to Play under the original package so existing users receive it as an update (user, 11 Nov 2026).
+        applicationId = "com.asl.wallet"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -41,7 +53,11 @@ android {
     productFlavors {
         create("uat") {
             dimension = "env"
-            applicationIdSuffix = ".uat"
+            // No applicationId suffix: UAT shares the live package com.asl.wallet so the single
+            // google-services.json (registered for com.asl.wallet) covers both builds. The UAT build stays
+            // distinguishable by its name, -uat version suffix and debuggable flag; it just can't be installed
+            // alongside the live app. To run them side by side instead, register com.asl.wallet.uat in Firebase
+            // and restore `applicationIdSuffix = ".uat"`.
             versionNameSuffix = "-uat"
             resValue("string", "app_name", "ASL Wallet UAT")
             buildConfigField("String", "BASE_URL", "\"https://www.testproject.co.in/app/api/v1/\"")
@@ -171,6 +187,15 @@ dependencies {
     implementation(libs.hilt.android)
     implementation(libs.hilt.navigation.compose)
     ksp(libs.hilt.compiler)
+
+    // Firebase: Analytics, Crashlytics, Cloud Messaging (push). Versions from the BoM.
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
+    implementation(libs.firebase.crashlytics)
+    implementation(libs.firebase.messaging)
+    // Google Play In-App Update (forced/immediate update gate).
+    implementation(libs.play.app.update)
+    implementation(libs.play.app.update.ktx)
     debugImplementation(libs.androidx.compose.ui.tooling)
     // API inspector for real-device testing: UAT debug builds only. Release and live builds contain no Chucker code.
     uatDebugImplementation(libs.chucker)

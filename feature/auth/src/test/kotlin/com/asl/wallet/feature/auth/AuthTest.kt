@@ -46,13 +46,15 @@ import retrofit2.converter.kotlinx.serialization.asConverterFactory
 private val testJson = Json { ignoreUnknownKeys = true; explicitNulls = false; coerceInputValues = true }
 
 class FakeLocal : AuthLocalStore {
-    var user: User? = null; var lastId: String? = null; var lang = false; var lock = false
+    var user: User? = null; var lastId: String? = null; var lang = false; var lock = false; var onboarded = false
     override suspend fun cachedUser() = user
     override suspend fun saveUser(user: User) { this.user = user }
     override suspend fun lastLoginId() = lastId
     override suspend fun saveLastLoginId(id: String) { lastId = id }
     override suspend fun isLanguageChosen() = lang
     override suspend fun setLanguageChosen() { lang = true }
+    override suspend fun isOnboardingSeen() = onboarded
+    override suspend fun setOnboardingSeen() { onboarded = true }
     override suspend fun isAppLockSetupDone() = lock
     override suspend fun setAppLockSetupDone() { lock = true }
     override suspend fun clearSession() { user = null }

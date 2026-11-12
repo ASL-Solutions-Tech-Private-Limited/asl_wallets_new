@@ -85,6 +85,24 @@ fun LockScreen(onUnlocked: () -> Unit) {
     }
 }
 
+/**
+ * Full-screen, non-dismissable update gate. A fintech build must not run an outdated version, so this blocks
+ * everything until the user installs the update from Google Play. It shows while Play reports a mandatory update.
+ */
+@Composable
+fun UpdateRequiredScreen(onUpdate: () -> Unit, inProgress: Boolean) {
+    Box(Modifier.fillMaxSize().systemBarsPadding(), contentAlignment = Alignment.Center) {
+        StateView(
+            icon = AslIcons.Update,
+            iconColors = AslGradients.action,
+            title = stringResource(R.string.update_title),
+            message = stringResource(R.string.update_body),
+        ) {
+            AslButton(stringResource(R.string.update_now), onClick = onUpdate, loading = inProgress)
+        }
+    }
+}
+
 /** Blocks payments on rooted/tampered phones. UAT builds can continue for testing; Live cannot. */
 @Composable
 fun UnsafeDeviceScreen(issues: Set<IntegrityIssue>, allowBypass: Boolean, onBypass: () -> Unit) {

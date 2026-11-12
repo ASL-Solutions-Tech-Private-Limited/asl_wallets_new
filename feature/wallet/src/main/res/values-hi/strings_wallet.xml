@@ -8,7 +8,7 @@
     <string name="w_show_balance">बैलेंस दिखाएँ</string>
     <string name="w_hide_balance">बैलेंस छिपाएँ</string>
     <string name="w_balance_hidden">बैलेंस छिपा है</string>
-    <string name="w_commission_chip">%1$s कमाए</string>
+    <string name="w_commission_chip">%1$s कमीशन</string>
     <string name="w_etopup">ई-टॉपअप</string>
     <string name="w_sales">बिक्री</string>
     <string name="w_commission">कमीशन</string>

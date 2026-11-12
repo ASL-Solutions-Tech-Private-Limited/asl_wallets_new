@@ -13,3 +13,6 @@ keystore.properties
 secrets.properties
 dist/
 .kotlin/
+
+# Firebase config (contains API key) — place locally / provide in CI, do not commit
+**/google-services.json

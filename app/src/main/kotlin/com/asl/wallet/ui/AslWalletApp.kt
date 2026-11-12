@@ -32,10 +32,12 @@ import com.asl.wallet.feature.auth.ui.LoginScreen
 import com.asl.wallet.feature.auth.ui.OtpScreen
 import com.asl.wallet.feature.auth.ui.PasswordChangedScreen
 import com.asl.wallet.feature.auth.ui.SessionViewModel
+import com.asl.wallet.feature.auth.ui.OnboardingScreen
 import com.asl.wallet.feature.auth.ui.SplashScreen
 import com.asl.wallet.feature.auth.ui.StartDestination
 import com.asl.wallet.ui.gate.LockScreen
 import com.asl.wallet.ui.gate.UnsafeDeviceScreen
+import com.asl.wallet.ui.gate.UpdateRequiredScreen
 import com.asl.wallet.core.designsystem.component.ListCard
 import com.asl.wallet.core.designsystem.component.ShopInfo
 import com.asl.wallet.feature.aeps.ui.AepsBankChooserSheet
@@ -94,6 +96,7 @@ import kotlinx.coroutines.delay
 
 object Routes {
     const val SPLASH = "splash"
+    const val ONBOARDING = "onboarding"
     const val LANGUAGE = "language"
     const val LOGIN = "login"
     const val OTP = "otp"
@@ -125,11 +128,16 @@ object Routes {
     const val SETTINGS = "settings"
 
     fun forgot(prefill: String?) = "forgot?prefill=" + Uri.encode(prefill.orEmpty())
-    val signedOutRoutes = setOf(SPLASH, LANGUAGE, LOGIN, OTP, FORGOT, PASSWORD_CHANGED)
+    val signedOutRoutes = setOf(SPLASH, ONBOARDING, LANGUAGE, LOGIN, OTP, FORGOT, PASSWORD_CHANGED)
 }
 
 @Composable
-fun AslWalletApp(vm: AppViewModel) {
+fun AslWalletApp(
+    vm: AppViewModel,
+    updateRequired: Boolean = false,
+    updateInProgress: Boolean = false,
+    onUpdate: () -> Unit = {},
+) {
     val themeMode by vm.themeMode.collectAsStateWithLifecycle()
     val lock by vm.lockState.collectAsStateWithLifecycle()
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -155,6 +163,7 @@ fun AslWalletApp(vm: AppViewModel) {
         Surface(Modifier.fillMaxSize(), color = AslTheme.colors.background) {
             val nav = rememberNavController()
             when {
+                updateRequired -> UpdateRequiredScreen(onUpdate, updateInProgress)
                 ui.integrityBlocked -> UnsafeDeviceScreen(ui.integrityIssues, BuildConfig.ALLOW_INTEGRITY_BYPASS, vm::bypassIntegrity)
                 BuildConfig.APP_LOCK_ENABLED && lock == LockState.Locked && session is SessionState.SignedIn -> LockScreen(onUnlocked = vm::onUnlocked)
                 else -> AppNavHost(nav, vm, ui, session, sessionVm)
@@ -184,12 +193,16 @@ private fun AppNavHost(nav: NavHostController, vm: AppViewModel, ui: AppUiState,
         composable(Routes.SPLASH) {
             SplashScreen(onDestination = { d ->
                 val route = when (d) {
+                    StartDestination.Onboarding -> Routes.ONBOARDING
                     StartDestination.Language -> Routes.LANGUAGE
                     StartDestination.Login -> Routes.LOGIN
                     StartDestination.Home -> Routes.MAIN
                 }
                 nav.navigate(route) { popUpTo(Routes.SPLASH) { inclusive = true } }
             })
+        }
+        composable(Routes.ONBOARDING) {
+            OnboardingScreen(onDone = { nav.navigate(Routes.LANGUAGE) { popUpTo(Routes.ONBOARDING) { inclusive = true } } })
         }
         composable(Routes.LANGUAGE) {
             LanguageScreen(onDone = { nav.navigate(Routes.LOGIN) { popUpTo(Routes.LANGUAGE) { inclusive = true } } })

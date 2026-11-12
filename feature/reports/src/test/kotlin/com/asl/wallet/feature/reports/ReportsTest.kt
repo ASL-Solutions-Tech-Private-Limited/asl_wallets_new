@@ -150,10 +150,10 @@ class ReportRulesTest {
 }
 
 class ReadersTest {
-    @Test fun `recharge row - masked number, no provider text, IDs kept`() {
+    @Test fun `recharge row - full number shown (client request), no provider text, IDs kept`() {
         val r = readRow(ReportKind.Recharge, obj(RECHARGE_ROW))!!
         assertThat(r.txnId).isEqualTo("8214758921330010")
-        assertThat(r.title).isEqualTo("JIO · 87XXX XX218")
+        assertThat(r.title).isEqualTo("JIO · 8709305218")
         assertThat(r.status).isEqualTo(RowStatus.Failed)
         assertThat(r.amount).isEqualTo(BigDecimal(55))
         assertThat(r.day).isEqualTo(Day(2026, 11, 5))

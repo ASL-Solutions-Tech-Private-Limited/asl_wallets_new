@@ -8,7 +8,7 @@
     <string name="w_show_balance">Show balance</string>
     <string name="w_hide_balance">Hide balance</string>
     <string name="w_balance_hidden">Balance hidden</string>
-    <string name="w_commission_chip">%1$s earned</string>
+    <string name="w_commission_chip">%1$s commission</string>
     <string name="w_etopup">E-topup</string>
     <string name="w_sales">Sales</string>
     <string name="w_commission">Commission</string>

@@ -49,8 +49,6 @@ internal fun cleanTime(raw: String?): String? {
 /** Last 4 digits only, whatever the server sent (it may already be masked). */
 internal fun last4(raw: String?): String? = raw?.filter(Char::isDigit)?.takeIf { it.length >= 4 }?.takeLast(4)
 
-private fun mobileOrId(raw: String?): String? = raw?.let { if (it.length == 10 && it.all(Char::isDigit)) Masking.mobile(it) else it }
-
 /** "Cash Withdrawal" → "CW"; one word ("JIO") → "JI". */
 internal fun initials(s: String?): String {
     val words = s.orEmpty().split(' ', '·').map { it.trim() }.filter { w -> w.any(Char::isLetter) }
@@ -79,9 +77,10 @@ fun readRow(kind: ReportKind, o: JsonObject): ReportRow? {
             val isMobile = no != null && no.length == 10 && no.all(Char::isDigit)
             val op = o.str("operatorName") ?: "Recharge"
             val ref = o.str("operatorRefNo")
-            f.add(Field.Operator, op); f.add(if (isMobile) Field.Number else Field.SubscriberId, mobileOrId(no))
+            // Recharge report shows the full mobile / subscriber number (client request — the retailer needs it to match the recharge).
+            f.add(Field.Operator, op); f.add(if (isMobile) Field.Number else Field.SubscriberId, no)
             f.add(Field.OperatorRef, ref); f.add(Field.TxnId, servid)
-            ReportRow(kind, servid, listOfNotNull(op, mobileOrId(no)).joinToString(" · "), "Ref ${ref ?: "—"}", o.amt("amount"), Statuses.of(o.str("tranStatus")), day, time, f, complaintOf(o), initials(op))
+            ReportRow(kind, servid, listOfNotNull(op, no).joinToString(" · "), "Ref ${ref ?: "—"}", o.amt("amount"), Statuses.of(o.str("tranStatus")), day, time, f, complaintOf(o), initials(op))
         }
         ReportKind.Payout -> {
             val name = o.str("reqBene", "beneficiaryName") ?: "Bank transfer"

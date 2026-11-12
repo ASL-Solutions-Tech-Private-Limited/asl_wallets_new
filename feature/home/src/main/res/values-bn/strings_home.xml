@@ -68,6 +68,7 @@
     <string name="tab_soon_title">%1$s শীঘ্রই আসছে</string>
     <string name="tab_soon_msg">এই অংশটি নতুন অ্যাপের পরের আপডেটে আসবে।</string>
     <string name="tab_logout">লগ আউট</string>
+    <string name="home_back_exit">বেরোতে আবার ব্যাক চাপুন</string>
     <string name="logout_title">লগ আউট করবেন?</string>
     <string name="logout_msg">আবার সাইন ইন করতে আপনার পাসওয়ার্ড লাগবে।</string>
 
@@ -83,7 +84,7 @@
     <string name="classic_wallet_balance">ওয়ালেট ব্যালেন্স</string>
     <string name="classic_add_money">টাকা যোগ করুন</string>
     <string name="classic_refresh">ব্যালেন্স রিফ্রেশ করুন</string>
-    <string name="classic_earned">আজকের আয় %1$s</string>
+    <string name="classic_earned">অর্জিত কমিশন %1$s</string>
     <string name="classic_news">পেআউট সকাল 7:00 থেকে রাত 11:45 পর্যন্ত খোলা   •   মোবাইল ও DTH রিচার্জ, মানি ট্রান্সফার ও রিপোর্ট অ্যাপে আছে   •   নিরাপদ থাকতে অ্যাপ আপডেট রাখুন</string>
     <string name="classic_banner1_t">AePS-এ বেশি আয় করুন</string>
     <string name="classic_banner1_s">ক্যাশ উইথড্রয়ালে সেরা কমিশন</string>

@@ -175,19 +175,15 @@ private fun AuthScaffold(title: String, onBack: (() -> Unit)?, content: @Composa
 
 /* ------------------------------------------------ Splash ------------------------------------------------ */
 
+/**
+ * Instant resolver that decides the first screen (Onboarding / Language / Login / Home) and routes to it.
+ * It is not a splash: it shows only the themed background while the session is restored (a few milliseconds).
+ */
 @Composable
 fun SplashScreen(onDestination: (StartDestination) -> Unit, vm: SplashViewModel = hiltViewModel()) {
     val dest by vm.destination.collectAsStateWithLifecycle()
     LaunchedEffect(dest) { dest?.let(onDestination) }
-    AuroraBox(Modifier.fillMaxSize()) {
-        Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            AslLogo(84)
-            Text("ASL Wallet", style = AslTheme.type.headline, color = Color.White)
-            Text(stringResource(R.string.auth_tagline), style = AslTheme.type.body, color = Color.White.copy(alpha = 0.8f))
-        }
-        Text(stringResource(R.string.auth_company), style = AslTheme.type.caption, color = Color.White.copy(alpha = 0.6f),
-            modifier = Modifier.align(Alignment.BottomCenter).systemBarsPadding().padding(bottom = 24.dp))
-    }
+    Box(Modifier.fillMaxSize().background(AslTheme.colors.background))
 }
 
 /* ----------------------------------------------- Language ----------------------------------------------- */

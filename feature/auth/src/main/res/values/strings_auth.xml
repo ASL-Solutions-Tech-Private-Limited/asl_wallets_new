@@ -2,6 +2,17 @@
 <resources>
     <string name="auth_tagline">Your shop\'s bank, in your hand</string>
     <string name="auth_company">ASL Solutions Tech Pvt. Ltd.</string>
+
+    <!-- Onboarding -->
+    <string name="ob_skip">Skip</string>
+    <string name="ob_next">Next</string>
+    <string name="ob_start">Get started</string>
+    <string name="ob1_title">All your services, one app</string>
+    <string name="ob1_body">Recharge, bill payments, money transfer, AePS and more — everything your shop needs in one place.</string>
+    <string name="ob2_title">Pay &amp; recharge in seconds</string>
+    <string name="ob2_body">Electricity, FASTag, DTH, mobile and broadband — serve every customer with instant confirmations.</string>
+    <string name="ob3_title">Earn on every transaction</string>
+    <string name="ob3_body">Grow your business with commission on each payment, kept safe by bank-grade security.</string>
     <string name="lang_title">Choose your language</string>
     <string name="lang_hint">You can change it later in Settings</string>
     <string name="common_continue">Continue</string>

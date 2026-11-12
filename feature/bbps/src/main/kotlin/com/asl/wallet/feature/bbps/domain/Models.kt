@@ -136,6 +136,21 @@ object BbpsRules {
         else -> Status.Pending
     }
 
+    private val PENDING_WORDS = listOf(
+        "PENDING", "PROCESSING", "INPROCESS", "INPROGRESS", "INITIATED", "INITIATE", "AWAITING", "UNDERPROCESS", "ACCEPTED",
+    )
+
+    /**
+     * True only when the status text is a genuine "still settling" word. The pay-bill API returns its rejection
+     * reason as free text in `txnstatus`/`message` (e.g. "The minimum allowed amount for FASTag recharges is Rs. 100"),
+     * which [statusOf] can't place and defaults to Pending — so the caller uses this to tell a real pending from a
+     * rejection and shows Failed instead of a misleading Pending receipt.
+     */
+    fun isPendingWord(raw: String?): Boolean {
+        val t = raw?.trim()?.uppercase()?.replace(" ", "") ?: return false
+        return PENDING_WORDS.any { t == it || t.contains(it) }
+    }
+
     /** Biller search on name, case-insensitive. */
     fun search(all: List<Biller>, q: String): List<Biller> {
         val t = q.trim()

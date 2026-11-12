@@ -6,7 +6,9 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.net.Uri
 import android.text.format.DateFormat
+import android.app.Activity
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -184,6 +186,22 @@ fun HomeShell(
     val state by vm.state.collectAsStateWithLifecycle()
     HomeEffects(vm, onOpenModule)
     AskNotificationPermission()
+
+    // Back behaviour: from any other tab, Back returns to Home; on Home, Back must be pressed twice to exit.
+    val context = LocalContext.current
+    var lastBackAt by remember { mutableLongStateOf(0L) }
+    BackHandler {
+        if (tab != HomeTab.Home) {
+            tab = HomeTab.Home
+        } else {
+            val now = System.currentTimeMillis()
+            if (now - lastBackAt < 2000L) (context as? Activity)?.finish()
+            else {
+                lastBackAt = now
+                Toast.makeText(context, context.getString(R.string.home_back_exit), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     Column(Modifier.fillMaxSize().background(AslTheme.colors.sheet)) {
         Box(Modifier.weight(1f)) {

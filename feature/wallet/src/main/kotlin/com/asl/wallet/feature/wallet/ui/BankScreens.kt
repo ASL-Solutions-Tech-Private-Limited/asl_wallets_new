@@ -134,7 +134,8 @@ fun AddBankScreen(onBack: () -> Unit, onDone: () -> Unit, onWallet: () -> Unit, 
     }) {
         PickerRow(stringResource(R.string.w_bank), f.bank?.name, stringResource(R.string.w_choose_bank), AslIcons.Bank,
             error = if (Field.Bank in p) stringResource(R.string.w_bank_needed) else null) { vm.loadOptions(); bankSheet = true }
-        AslTextField(f.account, vm::onAccount, stringResource(R.string.w_account_no), keyboardType = KeyboardType.NumberPassword, maxLength = 18,
+        // Account number is masked by default with a Show/Hide toggle; the confirm field below stays visible so it can be re-typed and checked.
+        AslTextField(f.account, vm::onAccount, stringResource(R.string.w_account_no), password = true, keyboardType = KeyboardType.Number, maxLength = 18,
             error = if (Field.Account in p) stringResource(R.string.w_account_bad) else null)
         AslTextField(f.confirm, vm::onConfirm, stringResource(R.string.w_account_confirm), keyboardType = KeyboardType.Number, maxLength = 18,
             error = if (Field.Confirm in p || (f.confirm.length >= f.account.length && f.confirm.isNotEmpty() && !f.confirmMatches)) stringResource(R.string.w_account_mismatch) else null,

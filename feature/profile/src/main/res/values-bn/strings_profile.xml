@@ -21,6 +21,9 @@
     <string name="pf_logout">লগ আউট</string>
     <string name="pf_logout_title">লগ আউট করবেন?</string>
     <string name="pf_logout_msg">আবার সাইন ইন করতে আপনার পাসওয়ার্ড লাগবে।</string>
+    <string name="pf_logout_msg_named">%1$s, আবার সাইন ইন করতে আপনার পাসওয়ার্ড লাগবে।</string>
+    <string name="pf_logout_confirm">হ্যাঁ, লগ আউট করুন</string>
+    <string name="pf_logout_stay">সাইন ইন থাকুন</string>
     <string name="pf_cancel">বাতিল</string>
     <string name="pf_version">ASL Wallet %1$s</string>
     <string name="pf_regno">রেজিস্ট্রেশন নম্বর</string>

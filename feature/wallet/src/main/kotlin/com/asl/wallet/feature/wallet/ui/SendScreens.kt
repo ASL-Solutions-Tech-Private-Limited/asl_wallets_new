@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
-import java.math.BigDecimal
 import com.asl.wallet.core.designsystem.component.shine
 import com.asl.wallet.core.designsystem.component.pressScale
 import com.asl.wallet.core.designsystem.component.popIn
@@ -124,10 +123,8 @@ fun SendMoneyScreen(
                     onClick = { accountSheet = true }, modifier = Modifier.popIn(100, rise = 16.dp))
                 AmountEntry(
                     s.amountText, s.amount, amountError, setup.limits, vm::onAmount, Modifier.popIn(180, rise = 16.dp),
-                    ask = stringResource(R.string.w_po_ask), autoFocus = false,
+                    ask = stringResource(R.string.w_po_ask), autoFocus = false, compact = true,
                 )
-                val quick = listOf(500L, 1_000L, 2_000L, 5_000L).filter { v -> BigDecimal(v) in setup.limits.min..setup.limits.max && (setup.balance == null || BigDecimal(v) <= setup.balance) }
-                QuickAmounts(quick, s.amount, { vm.onAmount(it.toString()) }, Modifier.popIn(240, rise = 16.dp), title = stringResource(R.string.w_po_quick), plus = false)
                 SectionLabel(stringResource(R.string.w_po_mode))
                 ModeChooser(setup.modes, s.mode, vm::onMode, Modifier.popIn(300, rise = 16.dp))
                 Note(stringResource(R.string.w_po_limits, Money.format(setup.limits.min, showPaise = false), Money.format(setup.limits.max, showPaise = false)))

@@ -28,4 +28,7 @@
     <string name="continue_uat">Continue anyway (UAT build only)</string>
     <string name="connection_check">Check secure connection</string>
     <string name="back">Back</string>
+    <string name="update_title">Update required</string>
+    <string name="update_body">A new version of ASL Wallet is available. Please update to continue — the current version can\'t be used for payments.</string>
+    <string name="update_now">Update now</string>
 </resources>

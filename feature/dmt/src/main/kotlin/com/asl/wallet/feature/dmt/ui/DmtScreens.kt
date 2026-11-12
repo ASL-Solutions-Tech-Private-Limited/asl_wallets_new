@@ -337,7 +337,8 @@ private fun AddRecipientPage(s: DmtState, vm: DmtViewModel) {
         HeaderText(stringResource(R.string.d_bank))
         ListCard { ListRow(f.bank?.name ?: stringResource(R.string.d_choose_bank), icon = AslIcons.Bank, onClick = { vm.loadBanks(); bankSheet = true }) }
         if (Field.Bank in p) Text(stringResource(R.string.d_bank_needed), style = AslTheme.type.caption, color = c.error)
-        AslTextField(f.account, vm::onAccount, stringResource(R.string.d_account_no), keyboardType = KeyboardType.NumberPassword, maxLength = 18,
+        // Account number is masked by default with a Show/Hide toggle; the confirm field below stays visible to re-type and check.
+        AslTextField(f.account, vm::onAccount, stringResource(R.string.d_account_no), password = true, keyboardType = KeyboardType.Number, maxLength = 18,
             error = if (Field.Account in p) stringResource(R.string.d_account_bad) else null)
         AslTextField(f.confirm, vm::onConfirm, stringResource(R.string.d_account_confirm), keyboardType = KeyboardType.Number, maxLength = 18,
             error = if (Field.Confirm in p || (f.confirm.length >= f.account.length && f.confirm.isNotEmpty() && f.confirm != f.account)) stringResource(R.string.d_account_mismatch) else null,
@@ -400,7 +401,7 @@ private fun AmountPage(s: DmtState, vm: DmtViewModel) {
     }) {
         CustomerCard(s, vm::changeCustomer)
         ListCard { RecipientRow(r) { vm.back() } }
-        AmountCard(s.amount?.let { BigDecimal(it) })
+        AmountCard(s.amount?.let { BigDecimal(it) }, compact = true)
         val quick = listOf(1000, 2000, 5000)
         ChoiceChips(quick.map(::rupees), quick.indexOf(s.amount).takeIf { it >= 0 }, { vm.onAmount(quick[it].toString()) })
         AslTextField(s.amountText, vm::onAmount, stringResource(R.string.d_amount), keyboardType = KeyboardType.Number, maxLength = 6,

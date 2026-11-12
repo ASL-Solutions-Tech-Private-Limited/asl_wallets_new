@@ -319,10 +319,7 @@ private fun DthFields(s: RechargeState, vm: RechargeViewModel) {
         }
         DthInfo.Soon -> AlertBanner(AlertKind.Info, stringResource(R.string.r_details_soon), message = stringResource(R.string.r_details_soon_msg))
     }
-    AmountCard(s.amount?.let { BigDecimal(it) })
-    val monthly = (s.dth as? DthInfo.Found)?.c?.monthly?.toInt()?.takeIf { it > 0 }
-    val quick = monthly?.let { listOf(it, it * 2, it * 3) } ?: listOf(200, 300, 500)
-    ChoiceChips(quick.map { rupees(it) }, quick.indexOfFirst { it == s.amount }.takeIf { it >= 0 }, { vm.onAmount(quick[it].toString()) })
+    AmountCard(s.amount?.let { BigDecimal(it) }, compact = true)
     AslTextField(s.amountText, vm::onAmount, stringResource(R.string.r_amount), keyboardType = KeyboardType.Number, maxLength = 5,
         error = if (s.showErrors && s.amount == null) stringResource(R.string.r_amount_bad) else null)
 }
@@ -433,7 +430,6 @@ private fun ReviewPage(s: RechargeState, vm: RechargeViewModel, onAddMoney: () -
             s.balance?.let { KeyValue(stringResource(R.string.r_pay_from), stringResource(R.string.r_wallet_amount, rupees(it))) },
             KeyValue(stringResource(R.string.r_amount), rupees(amount), total = true),
         )) }
-        AslTextField(s.customerName, vm::onCustomerName, stringResource(R.string.r_customer_name), maxLength = 60)
         s.shortBy?.let { short ->
             AlertBanner(AlertKind.Error, stringResource(R.string.r_low_balance, rupees(s.balance)), message = stringResource(R.string.r_low_balance_msg, rupees(short)), icon = AslIcons.Wallet)
         } ?: AlertBanner(AlertKind.Info, stringResource(if (mobile) R.string.r_check_number else R.string.r_check_id), message = stringResource(R.string.r_no_reverse), icon = AslIcons.Shield)

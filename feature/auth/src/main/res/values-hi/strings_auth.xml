@@ -2,6 +2,17 @@
 <resources>
     <string name="auth_tagline">आपकी दुकान का बैंक, आपके हाथ में</string>
     <string name="auth_company">ASL Solutions Tech Pvt. Ltd.</string>
+
+    <!-- Onboarding -->
+    <string name="ob_skip">छोड़ें</string>
+    <string name="ob_next">आगे</string>
+    <string name="ob_start">शुरू करें</string>
+    <string name="ob1_title">सभी सेवाएँ, एक ऐप में</string>
+    <string name="ob1_body">रिचार्ज, बिल भुगतान, मनी ट्रांसफर, AePS और भी बहुत कुछ — आपकी दुकान की हर ज़रूरत एक जगह।</string>
+    <string name="ob2_title">सेकंडों में भुगतान और रिचार्ज</string>
+    <string name="ob2_body">बिजली, FASTag, DTH, मोबाइल और ब्रॉडबैंड — हर ग्राहक को तुरंत पुष्टि के साथ सेवा दें।</string>
+    <string name="ob3_title">हर लेनदेन पर कमाई</string>
+    <string name="ob3_body">हर भुगतान पर कमीशन कमाएँ और बैंक-स्तरीय सुरक्षा के साथ अपना कारोबार बढ़ाएँ।</string>
     <string name="lang_title">अपनी भाषा चुनें</string>
     <string name="lang_hint">आप इसे बाद में सेटिंग में बदल सकते हैं</string>
     <string name="common_continue">जारी रखें</string>

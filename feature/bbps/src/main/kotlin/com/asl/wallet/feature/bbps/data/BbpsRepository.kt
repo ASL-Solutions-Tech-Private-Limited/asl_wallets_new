@@ -1,6 +1,7 @@
 package com.asl.wallet.feature.bbps.data
 
 import com.asl.wallet.core.common.session.SignOutCleanup
+import com.asl.wallet.core.network.DEFAULT_ERROR
 import com.asl.wallet.core.network.NetworkResult
 import com.asl.wallet.core.network.safeApiCall
 import com.asl.wallet.core.network.safeServerMessage
@@ -82,6 +83,37 @@ class BbpsRepositoryImpl @Inject constructor(private val api: BbpsApi, private v
         return safeApiCall(json) { api.fetchBill(FetchBillRequest(biller.code, biller.category, post)) }.read(::readBill)
     }
 
+    /**
+     * pay-bill is called raw (no [safeApiCall]) because it does not use the standard envelope. A timeout or 5xx is
+     * surfaced so [pay] can mark the payment Pending (never Failed by guess — the money may have moved); a 2xx
+     * returns the body for [readPay], which reads the flat or the enveloped shape.
+     */
+    private suspend fun rawPay(key: String, body: kotlinx.serialization.json.JsonObject): NetworkResult<JsonElement> = try {
+        val resp = api.payBill(key, body)
+        when {
+            resp.code() == 401 -> NetworkResult.Failure.Unauthorized
+            resp.isSuccessful -> resp.body()?.let { NetworkResult.Success(it, null) }
+                ?: NetworkResult.Failure.Unexpected("Empty pay-bill response")
+            resp.code() >= 500 -> NetworkResult.Failure.Api(resp.code(), null, "Server error")
+            else -> {
+                val el = runCatching { resp.errorBody()?.string()?.let(json::parseToJsonElement) }.getOrNull()
+                NetworkResult.Failure.Api(resp.code(), null, el?.let { readPay(it).message } ?: DEFAULT_ERROR)
+            }
+        }
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (e: java.net.SocketTimeoutException) {
+        NetworkResult.Failure.Timeout
+    } catch (e: java.net.UnknownHostException) {
+        NetworkResult.Failure.NoInternet
+    } catch (e: java.net.ConnectException) {
+        NetworkResult.Failure.NoInternet
+    } catch (e: java.io.IOException) {
+        NetworkResult.Failure.NoInternet
+    } catch (e: Exception) {
+        NetworkResult.Failure.Unexpected("Unreadable BBPS answer")
+    }
+
     override suspend fun pay(p: BillPayment): BbpsOutcome {
         // Same fields as the Postman sample; requestId and the xml are exactly what fetch-bill returned.
         val body = buildJsonObject {
@@ -96,7 +128,7 @@ class BbpsRepositoryImpl @Inject constructor(private val api: BbpsApi, private v
             put("requestId", p.bill.requestId)
             put("billPaymentRequestxml", p.bill.xml)
         }
-        val r = safeApiCall(json) { api.payBill(p.key.value, body) }
+        val r = rawPay(p.key.value, body)
         fun receipt(ref: String? = null, bbps: String? = null) = BbpsReceipt(
             p.biller.category, p.biller.name, p.inputs.firstOrNull()?.first?.name ?: "Consumer number", p.consumerNumber,
             p.bill.customerName, p.bill.billNumber, p.amount, ref, bbps, "",
@@ -111,7 +143,16 @@ class BbpsRepositoryImpl @Inject constructor(private val api: BbpsApi, private v
                     else -> when (BbpsRules.statusOf(a.status)) {
                         BbpsRules.Status.Success -> BbpsOutcome.Paid(rec, a.balanceAfter)
                         BbpsRules.Status.Failed -> BbpsOutcome.Failed(rec, a.message?.let(::safeServerMessage) ?: r.message?.let(::safeServerMessage), debited = true)
-                        BbpsRules.Status.Pending -> BbpsOutcome.Pending(rec)
+                        BbpsRules.Status.Pending -> {
+                            // A real pending carries a settlement reference (apiTrnID / resApiTxnId). An unrecognised
+                            // status with none is the server's rejection message, not a pending — show Failed, not debited.
+                            val settled = !a.bbpsTxnId.isNullOrBlank()
+                            if (!settled && !BbpsRules.isPendingWord(a.status)) {
+                                BbpsOutcome.Failed(rec, (a.message ?: a.status)?.let(::safeServerMessage), debited = false)
+                            } else {
+                                BbpsOutcome.Pending(rec)
+                            }
+                        }
                     }
                 }
             }

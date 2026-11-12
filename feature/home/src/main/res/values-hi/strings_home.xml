@@ -68,6 +68,7 @@
     <string name="tab_soon_title">%1$s जल्द आ रहा है</string>
     <string name="tab_soon_msg">यह हिस्सा नए ऐप के अगले अपडेट में आएगा।</string>
     <string name="tab_logout">लॉग आउट</string>
+    <string name="home_back_exit">बाहर निकलने के लिए फिर से बैक दबाएँ</string>
     <string name="logout_title">लॉग आउट करें?</string>
     <string name="logout_msg">फिर से साइन इन करने के लिए आपको अपना पासवर्ड चाहिए होगा।</string>
 
@@ -83,7 +84,7 @@
     <string name="classic_wallet_balance">वॉलेट बैलेंस</string>
     <string name="classic_add_money">पैसे जोड़ें</string>
     <string name="classic_refresh">बैलेंस रीफ़्रेश करें</string>
-    <string name="classic_earned">आज की कमाई %1$s</string>
+    <string name="classic_earned">अर्जित कमीशन %1$s</string>
     <string name="classic_news">पेआउट सुबह 7:00 से रात 11:45 तक खुला है   •   मोबाइल और DTH रिचार्ज, मनी ट्रांसफ़र और रिपोर्ट ऐप में हैं   •   सुरक्षित रहने के लिए ऐप अपडेट रखें</string>
     <string name="classic_banner1_t">AePS पर ज़्यादा कमाएँ</string>
     <string name="classic_banner1_s">कैश निकासी पर सबसे अच्छा कमीशन</string>

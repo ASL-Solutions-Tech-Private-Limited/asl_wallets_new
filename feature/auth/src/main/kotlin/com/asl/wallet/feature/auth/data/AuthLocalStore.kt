@@ -29,6 +29,8 @@ interface AuthLocalStore {
     suspend fun saveLastLoginId(id: String)
     suspend fun isLanguageChosen(): Boolean
     suspend fun setLanguageChosen()
+    suspend fun isOnboardingSeen(): Boolean
+    suspend fun setOnboardingSeen()
     suspend fun isAppLockSetupDone(): Boolean
     suspend fun setAppLockSetupDone()
     /** Removes the profile. Keeps last login ID and flags so the next sign-in is quick. */
@@ -44,6 +46,7 @@ class DataStoreAuthLocalStore @Inject constructor(
     private val userKey = stringPreferencesKey("user")
     private val lastIdKey = stringPreferencesKey("last_id")
     private val langKey = booleanPreferencesKey("language_chosen")
+    private val onboardKey = booleanPreferencesKey("onboarding_seen")
     private val lockKey = booleanPreferencesKey("app_lock_setup")
     private val ds get() = context.authStore
 
@@ -59,6 +62,8 @@ class DataStoreAuthLocalStore @Inject constructor(
     override suspend fun saveLastLoginId(id: String) { ds.edit { it[lastIdKey] = cipher.encrypt(id) } }
     override suspend fun isLanguageChosen() = ds.data.first()[langKey] == true
     override suspend fun setLanguageChosen() { ds.edit { it[langKey] = true } }
+    override suspend fun isOnboardingSeen() = ds.data.first()[onboardKey] == true
+    override suspend fun setOnboardingSeen() { ds.edit { it[onboardKey] = true } }
     override suspend fun isAppLockSetupDone() = ds.data.first()[lockKey] == true
     override suspend fun setAppLockSetupDone() { ds.edit { it[lockKey] = true } }
     override suspend fun clearSession() { ds.edit { it.remove(userKey) } }

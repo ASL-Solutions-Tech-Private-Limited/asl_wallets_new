@@ -28,4 +28,7 @@
     <string name="continue_uat">फिर भी जारी रखें (केवल UAT बिल्ड)</string>
     <string name="connection_check">सुरक्षित कनेक्शन जाँचें</string>
     <string name="back">वापस</string>
+    <string name="update_title">अपडेट ज़रूरी है</string>
+    <string name="update_body">ASL Wallet का नया वर्शन उपलब्ध है। जारी रखने के लिए अपडेट करें — मौजूदा वर्शन से भुगतान नहीं किया जा सकता।</string>
+    <string name="update_now">अभी अपडेट करें</string>
 </resources>

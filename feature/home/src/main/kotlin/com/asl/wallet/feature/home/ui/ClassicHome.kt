@@ -64,6 +64,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -173,6 +174,13 @@ internal fun ClassicHomeTab(
                     fun open(kind: ServiceKind, label: String) {
                         state.services.firstOrNull { it.kind == kind }?.let(vm::onServiceClick) ?: vm.onComingSoon(label)
                     }
+                    // DTH shares the recharge module with Mobile. The server usually sends one "Recharge" service
+                    // (classified as Mobile), so open that same service but mark the key so Recharge opens in DTH mode.
+                    fun openDth(label: String) {
+                        val svc = state.services.firstOrNull { it.kind == ServiceKind.Dth }
+                            ?: state.services.firstOrNull { it.kind == ServiceKind.Mobile }?.copy(key = "dth")
+                        svc?.let(vm::onServiceClick) ?: vm.onComingSoon(label)
+                    }
                     fun report(r: HomeReport, label: String) = onReport?.invoke(r) ?: vm.onComingSoon(label)
                     fun pic(res: Int) = ServiceArt.Picture(res)
                     val neutral = AslGradients.Service.Neutral.colors
@@ -209,7 +217,7 @@ internal fun ClassicHomeTab(
                                         ServiceItem(rcReport, AslIcons.Report, neutral, art = pic(DS.drawable.classic_ic_mobile_report)),
                                     )
                                     ServiceGrid(items, columns = 3, startDelayMs = delayMs + 40, onClick = { when (items.indexOf(it)) {
-                                        0 -> open(ServiceKind.Mobile, mobile); 1 -> open(ServiceKind.Dth, dth); else -> report(HomeReport.Recharge, rcReport)
+                                        0 -> open(ServiceKind.Mobile, mobile); 1 -> openDth(dth); else -> report(HomeReport.Recharge, rcReport)
                                     } })
                                 }
                             }
@@ -293,8 +301,6 @@ private fun DashboardBar(state: HomeUiState, onNotifications: () -> Unit, onArra
         Column(Modifier.weight(1f).semantics(mergeDescendants = true) { heading() }) {
             Text(stringResource(R.string.classic_welcome_short), style = AslTheme.type.caption, color = Color.White.copy(alpha = 0.75f))
             Text(u?.name.orEmpty(), style = AslTheme.type.title, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            val sub = listOfNotNull(u?.shopName?.ifBlank { null }, u?.regno?.let { "R-$it" }).joinToString(" · ")
-            if (sub.isNotEmpty()) Text(sub, style = AslTheme.type.caption, color = Color.White.copy(alpha = 0.75f), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         RoundHeaderIcon(AslIcons.Arrange, stringResource(R.string.arrange_title), onArrange)
         RoundHeaderIcon(AslIcons.Bell, stringResource(R.string.home_notifications), onNotifications)
@@ -343,15 +349,16 @@ private fun BalanceBlock(state: HomeUiState, vm: HomeViewModel, onWallet: (() ->
             .then(if (onWallet != null) Modifier.clickable(role = Role.Button, onClickLabel = stringResource(R.string.home_open_wallet), onClick = onWallet) else Modifier),
     ) {
         Text(stringResource(R.string.classic_wallet_balance), style = AslTheme.type.bodyStrong.copy(fontSize = AslTheme.type.label.fontSize), color = ink)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        val hidden = state.balanceHidden
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             val w = state.wallet
             when {
                 state.loading && w == null -> Box(Modifier.padding(top = 4.dp).size(120.dp, 20.dp).clip(RoundedCornerShape(6.dp)).shimmer())
                 w == null -> Text("₹ —", style = AslTheme.type.title, color = ink)
                 else -> Text(
-                    if (state.balanceHidden) "₹ ••••" else Money.format(countUp(w.balance)),
+                    if (hidden) "₹ ••••" else Money.format(countUp(w.balance)),
                     style = AslTheme.type.headline, color = ink,
-                    modifier = Modifier.clickable(role = Role.Button, onClickLabel = stringResource(if (state.balanceHidden) R.string.home_show_balance else R.string.home_hide_balance), onClick = vm::toggleBalance),
+                    modifier = Modifier.clickable(role = Role.Button, onClickLabel = stringResource(if (hidden) R.string.home_show_balance else R.string.home_hide_balance), onClick = vm::toggleBalance),
                 )
             }
             val refresh = stringResource(R.string.classic_refresh)
@@ -363,9 +370,38 @@ private fun BalanceBlock(state: HomeUiState, vm: HomeViewModel, onWallet: (() ->
                     }
                     .padding(3.dp),
             )
+            // Show/Hide toggle sits with the balance it controls (kept clear of the Add Money button).
+            Row(
+                Modifier.clip(RoundedCornerShape(50))
+                    .background(ink.copy(alpha = 0.07f))
+                    .border(1.dp, ink.copy(alpha = 0.14f), RoundedCornerShape(50))
+                    .clickable(
+                        role = Role.Button,
+                        onClickLabel = stringResource(if (hidden) R.string.home_show_balance else R.string.home_hide_balance),
+                        onClick = vm::toggleBalance,
+                    ).padding(horizontal = 10.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Icon(if (hidden) AslIcons.Eye else AslIcons.EyeOff, null, tint = ink, modifier = Modifier.size(14.dp))
+                Text(
+                    stringResource(if (hidden) R.string.home_show else R.string.home_hide),
+                    style = AslTheme.type.caption.copy(fontWeight = FontWeight.SemiBold), color = ink,
+                )
+            }
         }
         state.wallet?.takeIf { it.commission.signum() > 0 }?.let {
-            Text(stringResource(R.string.classic_earned, Money.format(it.commission, showPaise = false)), style = AslTheme.type.caption, color = AslTheme.colors.success)
+            Row(
+                Modifier.padding(top = 6.dp).clip(RoundedCornerShape(50))
+                    .background(AslTheme.colors.successBg).padding(horizontal = 8.dp, vertical = 3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Icon(AslIcons.ArrowUp, null, tint = AslTheme.colors.success, modifier = Modifier.size(13.dp))
+                Text(
+                    stringResource(R.string.classic_earned, Money.format(it.commission, showPaise = false)),
+                    style = AslTheme.type.caption.copy(fontWeight = FontWeight.SemiBold), color = AslTheme.colors.success,
+                )
+            }
         }
     }
 }

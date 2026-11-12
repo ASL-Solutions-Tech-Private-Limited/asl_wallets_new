@@ -169,8 +169,10 @@ internal fun AmountEntry(
     modifier: Modifier,
     ask: String = stringResource(R.string.w_am_ask),
     autoFocus: Boolean = true,
+    compact: Boolean = false,
 ) {
     val c = AslTheme.colors
+    val amountScale = if (compact) 0.8f else 1.15f
     val still = reduceMotion()
     var focused by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
@@ -187,24 +189,24 @@ internal fun AmountEntry(
     Column(
         modifier.fillMaxWidth().graphicsLayer { translationX = shake.value * density }
             .shadow(if (focused) 6.dp else 1.dp, shape).clip(shape).background(c.surface).border(if (focused || error != null) 2.dp else 1.dp, ring, shape)
-            .padding(horizontal = 16.dp, vertical = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp),
+            .padding(horizontal = 16.dp, vertical = if (compact) 10.dp else 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (compact) 3.dp else 6.dp),
     ) {
         Text(ask, style = AslTheme.type.label, color = c.textSecondary)
         val desc = stringResource(R.string.w_am_amount_desc)
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.graphicsLayer { scaleX = bump.value; scaleY = bump.value }) {
-            Text("₹", style = AslTheme.type.amountDisplay.copy(fontSize = AslTheme.type.amountDisplay.fontSize * 1.15f), color = if (text.isEmpty()) c.outline else c.primary)
+            Text("₹", style = AslTheme.type.amountDisplay.copy(fontSize = AslTheme.type.amountDisplay.fontSize * amountScale), color = if (text.isEmpty()) c.outline else c.primary)
             Spacer(Modifier.width(6.dp))
             BasicTextField(
                 value = text, onValueChange = onAmount, singleLine = true,
-                textStyle = AslTheme.type.amountDisplay.copy(fontSize = AslTheme.type.amountDisplay.fontSize * 1.15f, color = c.primary, textAlign = TextAlign.Start),
+                textStyle = AslTheme.type.amountDisplay.copy(fontSize = AslTheme.type.amountDisplay.fontSize * amountScale, color = c.primary, textAlign = TextAlign.Start),
                 cursorBrush = SolidColor(c.primaryEnd),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
                 keyboardActions = rememberImeActions(ImeAction.Done),
                 modifier = Modifier.widthIn(min = 28.dp).width(IntrinsicSize.Min).focusRequester(focus).onFocusChanged { focused = it.isFocused }
                     .semantics { contentDescription = desc },
                 decorationBox = { inner ->
-                    Box { if (text.isEmpty()) Text("0", style = AslTheme.type.amountDisplay.copy(fontSize = AslTheme.type.amountDisplay.fontSize * 1.15f), color = c.outline); inner() }
+                    Box { if (text.isEmpty()) Text("0", style = AslTheme.type.amountDisplay.copy(fontSize = AslTheme.type.amountDisplay.fontSize * amountScale), color = c.outline); inner() }
                 },
             )
         }

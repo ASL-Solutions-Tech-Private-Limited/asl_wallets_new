@@ -31,7 +31,7 @@ const val OTP_TRIES = 3
 
 /* ------------------------------------------------ Splash ------------------------------------------------ */
 
-enum class StartDestination { Language, Login, Home }
+enum class StartDestination { Onboarding, Language, Login, Home }
 
 @HiltViewModel
 class SplashViewModel @Inject constructor(
@@ -43,16 +43,15 @@ class SplashViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            val started = System.currentTimeMillis()
+            // Resolve where to land. There is no logo splash any more: first-time (signed-out) users
+            // see the animated onboarding; returning or signed-in users go straight through.
             val state = session.restore()
-            val dest = when {
+            _destination.value = when {
                 state is SessionState.SignedIn -> StartDestination.Home
+                !local.isOnboardingSeen() -> StartDestination.Onboarding
                 !local.isLanguageChosen() -> StartDestination.Language
                 else -> StartDestination.Login
             }
-            val elapsed = System.currentTimeMillis() - started
-            if (elapsed < 900) delay(900 - elapsed) // let the logo animation finish
-            _destination.value = dest
         }
     }
 }
@@ -60,6 +59,12 @@ class SplashViewModel @Inject constructor(
 @HiltViewModel
 class LanguageViewModel @Inject constructor(private val local: AuthLocalStore) : ViewModel() {
     fun done(onDone: () -> Unit) = viewModelScope.launch { local.setLanguageChosen(); onDone() }
+}
+
+@HiltViewModel
+class OnboardingViewModel @Inject constructor(private val local: AuthLocalStore) : ViewModel() {
+    /** Mark onboarding seen so it never shows again, then continue. */
+    fun finish(onDone: () -> Unit) = viewModelScope.launch { local.setOnboardingSeen(); onDone() }
 }
 
 /* ------------------------------------------------ Login ------------------------------------------------- */

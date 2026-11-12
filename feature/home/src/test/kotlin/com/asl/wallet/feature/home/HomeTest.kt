@@ -364,18 +364,17 @@ class HomeViewModelTest {
         assertThat(vm.state.value.sections).isEqualTo(HomeLayout.DEFAULT)
     }
 
-    @Test fun `balance hides itself after 10 seconds and again after being shown`() = runTest {
+    @Test fun `balance shows by default and only hides when the retailer toggles it`() = runTest {
         val (_, vm) = vm()
         runCurrent()
         assertThat(vm.state.value.balanceHidden).isFalse()
-        advanceTimeBy(HomeViewModel.AUTO_HIDE_MS + 1)
+        // No auto-hide: it stays shown however long the screen is open (client request).
+        advanceTimeBy(60_000)
+        assertThat(vm.state.value.balanceHidden).isFalse()
+        vm.toggleBalance()
         assertThat(vm.state.value.balanceHidden).isTrue()
         vm.toggleBalance()
         assertThat(vm.state.value.balanceHidden).isFalse()
-        advanceTimeBy(HomeViewModel.AUTO_HIDE_MS - 1_000)
-        assertThat(vm.state.value.balanceHidden).isFalse()
-        advanceTimeBy(1_001)
-        assertThat(vm.state.value.balanceHidden).isTrue()
     }
 
     @Test fun `offline with a saved balance shows it and flags offline`() = runTest {

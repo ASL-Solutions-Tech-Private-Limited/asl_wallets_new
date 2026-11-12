@@ -21,6 +21,9 @@
     <string name="pf_logout">Log out</string>
     <string name="pf_logout_title">Log out?</string>
     <string name="pf_logout_msg">You\'ll need your password to sign in again.</string>
+    <string name="pf_logout_msg_named">%1$s, you\'ll need your password to sign in again.</string>
+    <string name="pf_logout_confirm">Yes, log me out</string>
+    <string name="pf_logout_stay">Stay signed in</string>
     <string name="pf_cancel">Cancel</string>
     <string name="pf_version">ASL Wallet %1$s</string>
     <string name="pf_regno">Registration no.</string>

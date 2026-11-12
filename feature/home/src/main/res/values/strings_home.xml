@@ -68,6 +68,7 @@
     <string name="tab_soon_title">%1$s is coming soon</string>
     <string name="tab_soon_msg">This section arrives in a later update of the new app.</string>
     <string name="tab_logout">Log out</string>
+    <string name="home_back_exit">Press back again to exit</string>
     <string name="logout_title">Log out?</string>
     <string name="logout_msg">You\'ll need your password to sign in again.</string>
 
@@ -83,7 +84,7 @@
     <string name="classic_wallet_balance">Wallet Balance</string>
     <string name="classic_add_money">Add Money</string>
     <string name="classic_refresh">Refresh balance</string>
-    <string name="classic_earned">Earned today %1$s</string>
+    <string name="classic_earned">Commission earned %1$s</string>
     <string name="classic_news">Payout is open 7:00 am – 11:45 pm   •   Mobile and DTH recharge, money transfer and reports are in the app   •   Keep the app updated for the safest experience</string>
     <string name="classic_banner1_t">Earn more on AePS</string>
     <string name="classic_banner1_s">Best commission on cash withdrawal</string>

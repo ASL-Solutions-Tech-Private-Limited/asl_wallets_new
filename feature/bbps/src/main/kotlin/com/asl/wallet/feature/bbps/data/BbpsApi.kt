@@ -31,9 +31,14 @@ interface BbpsApi {
     @POST("merchant/bbps/fetch-bill")
     suspend fun fetchBill(@Body body: FetchBillRequest): Response<ApiEnvelope<JsonElement>>
 
-    /** Moves money. One [ApiHeaders.IDEMPOTENCY_KEY] per confirmed payment; never retried by the app. */
+    /**
+     * Moves money. One [ApiHeaders.IDEMPOTENCY_KEY] per confirmed payment; never retried by the app.
+     * Returns the raw body because pay-bill does not use the standard envelope: on UAT it answers a flat object
+     * whose `status` is a number (e.g. `{"status":200,"txnstatus":"...reason...","apiTrnID":"",...}`), which the
+     * Boolean-`status` [ApiEnvelope] cannot parse. The repository reads it with [readPay], which handles both shapes.
+     */
     @POST("merchant/bbps/pay-bill")
-    suspend fun payBill(@Header(ApiHeaders.IDEMPOTENCY_KEY) idempotencyKey: String, @Body body: JsonObject): Response<ApiEnvelope<JsonElement>>
+    suspend fun payBill(@Header(ApiHeaders.IDEMPOTENCY_KEY) idempotencyKey: String, @Body body: JsonObject): Response<JsonElement>
 
     @GET("merchant/my-wallet/account-info")
     suspend fun accountInfo(): Response<ApiEnvelope<BalanceDto>>

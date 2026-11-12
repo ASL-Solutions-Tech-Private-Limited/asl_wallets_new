@@ -14,6 +14,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -53,9 +54,11 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -260,9 +263,12 @@ private fun Slip(
         Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 24.dp)) {
             // shop
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(Modifier.size(32.dp).background(Brush.linearGradient(listOf(Color(0xFF1E1B4B), Color(0xFF6366F1))), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
-                    Text("ASL", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Black)
-                }
+                Image(
+                    painterResource(com.asl.wallet.core.designsystem.R.drawable.classic_ic_asl_logo),
+                    null,
+                    Modifier.size(48.dp),
+                    contentScale = ContentScale.Fit,
+                )
                 Text(listOf(shop.name, shop.id).filter { it.isNotBlank() }.joinToString(" · "), color = Paper.ink, fontSize = 13.5.sp, fontWeight = FontWeight.ExtraBold,
                     textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
                 if (shop.addressLine.isNotBlank()) Text(shop.addressLine, color = Paper.soft, fontSize = 10.5.sp, textAlign = TextAlign.Center)

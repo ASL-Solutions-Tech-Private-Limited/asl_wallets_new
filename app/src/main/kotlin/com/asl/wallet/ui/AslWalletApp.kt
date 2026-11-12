@@ -38,6 +38,7 @@ import com.asl.wallet.feature.auth.ui.StartDestination
 import com.asl.wallet.ui.gate.LockScreen
 import com.asl.wallet.ui.gate.UnsafeDeviceScreen
 import com.asl.wallet.ui.gate.UpdateRequiredScreen
+import com.asl.wallet.core.designsystem.component.AdaptiveContent
 import com.asl.wallet.core.designsystem.component.ListCard
 import com.asl.wallet.core.designsystem.component.ShopInfo
 import com.asl.wallet.feature.aeps.ui.AepsBankChooserSheet
@@ -161,12 +162,15 @@ fun AslWalletApp(
         LaunchedEffect(Unit) { while (true) { delay(5_000); vm.checkIdle() } }
 
         Surface(Modifier.fillMaxSize(), color = AslTheme.colors.background) {
-            val nav = rememberNavController()
-            when {
-                updateRequired -> UpdateRequiredScreen(onUpdate, updateInProgress)
-                ui.integrityBlocked -> UnsafeDeviceScreen(ui.integrityIssues, BuildConfig.ALLOW_INTEGRITY_BYPASS, vm::bypassIntegrity)
-                BuildConfig.APP_LOCK_ENABLED && lock == LockState.Locked && session is SessionState.SignedIn -> LockScreen(onUnlocked = vm::onUnlocked)
-                else -> AppNavHost(nav, vm, ui, session, sessionVm)
+            // Phone-first, but centred as one column on tablets / landscape / split-screen (see AdaptiveContent).
+            AdaptiveContent {
+                val nav = rememberNavController()
+                when {
+                    updateRequired -> UpdateRequiredScreen(onUpdate, updateInProgress)
+                    ui.integrityBlocked -> UnsafeDeviceScreen(ui.integrityIssues, BuildConfig.ALLOW_INTEGRITY_BYPASS, vm::bypassIntegrity)
+                    BuildConfig.APP_LOCK_ENABLED && lock == LockState.Locked && session is SessionState.SignedIn -> LockScreen(onUnlocked = vm::onUnlocked)
+                    else -> AppNavHost(nav, vm, ui, session, sessionVm)
+                }
             }
         }
     }

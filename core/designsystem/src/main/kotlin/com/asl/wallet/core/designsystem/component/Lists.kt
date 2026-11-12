@@ -237,13 +237,18 @@ data class ServiceItem(
 /** Four-column service grid (Home, All services). Tiles pop in one after another; [startDelayMs] offsets a later grid. */
 @Composable
 fun ServiceGrid(items: List<ServiceItem>, onClick: (ServiceItem) -> Unit, modifier: Modifier = Modifier, compact: Boolean = false, startDelayMs: Int = 150, columns: Int = 4) {
-    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        items.chunked(columns).forEachIndexed { r, row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                row.forEachIndexed { i, item ->
-                    ServiceTile(item, { onClick(item) }, Modifier.weight(1f).popIn(startDelayMs + (r * columns + i) * 50), compact)
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        // [columns] is the phone baseline; wider screens (tablet, landscape) add columns, never fewer, and never
+        // more than there are items — so a 3-item row never spreads into empty gaps on a big screen.
+        val cols = maxOf(columns, (maxWidth / 112.dp).toInt()).coerceAtMost(maxOf(columns, items.size))
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            items.chunked(cols).forEachIndexed { r, row ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    row.forEachIndexed { i, item ->
+                        ServiceTile(item, { onClick(item) }, Modifier.weight(1f).popIn(startDelayMs + (r * cols + i) * 50), compact)
+                    }
+                    repeat(cols - row.size) { Spacer(Modifier.weight(1f)) }
                 }
-                repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }

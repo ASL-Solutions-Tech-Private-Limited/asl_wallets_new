@@ -39,23 +39,33 @@ class AppLockManager(
     @Volatile var isSessionActive: Boolean = false
         set(value) { field = value; if (!value) _state.value = LockState.Unlocked }
 
+    /**
+     * Whether the user has turned app lock on. Opt-in: the app sets this from the saved preference when a
+     * session starts, and from the Settings toggle. While off, the app never locks (and turning it off unlocks
+     * immediately). Defaults to on so the lock rules are testable on their own; the app decides per user.
+     */
+    @Volatile var enabled: Boolean = true
+        set(value) { field = value; if (!value) _state.value = LockState.Unlocked }
+
+    private val armed: Boolean get() = enabled && isSessionActive
+
     private var backgroundedAt: Long? = null
     private var lastInteractionAt: Long = clock.nowMillis()
 
     /** Call on cold start once a session is restored, so the app opens locked. */
-    fun lockNow() { if (isSessionActive) _state.value = LockState.Locked }
+    fun lockNow() { if (armed) _state.value = LockState.Locked }
 
     fun onBackgrounded() { backgroundedAt = clock.nowMillis() }
 
     fun onForegrounded() {
         val since = backgroundedAt ?: return
         backgroundedAt = null
-        if (isSessionActive && clock.nowMillis() - since >= backgroundTimeoutMs) _state.value = LockState.Locked
+        if (armed && clock.nowMillis() - since >= backgroundTimeoutMs) _state.value = LockState.Locked
     }
 
     fun onUserInteraction() {
         val now = clock.nowMillis()
-        if (isSessionActive && _state.value == LockState.Unlocked && now - lastInteractionAt >= idleTimeoutMs) {
+        if (armed && _state.value == LockState.Unlocked && now - lastInteractionAt >= idleTimeoutMs) {
             _state.value = LockState.Locked
         }
         lastInteractionAt = now
@@ -63,7 +73,7 @@ class AppLockManager(
 
     /** Polled by the UI every few seconds so an idle screen locks even without a touch. */
     fun checkIdle() {
-        if (isSessionActive && _state.value == LockState.Unlocked && clock.nowMillis() - lastInteractionAt >= idleTimeoutMs) {
+        if (armed && _state.value == LockState.Unlocked && clock.nowMillis() - lastInteractionAt >= idleTimeoutMs) {
             _state.value = LockState.Locked
         }
     }

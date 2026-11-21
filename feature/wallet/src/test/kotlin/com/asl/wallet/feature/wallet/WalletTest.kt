@@ -151,13 +151,12 @@ class WalletDomainTest {
         assertThat(Day(2026, 1, 9).iso()).isEqualTo("2026-01-09")
     }
 
-    @Test fun `add bank account - numbers match, IFSC format, holder name and both photos`() {
-        val ok = AddBankForm(BankOption("12", "UCO BANK"), "32840110063873", "32840110063873", "UCBA0003284", "AJAY KUMAR", AccountOwner.Self, 120_000, 200_000)
+    @Test fun `add bank account - numbers match, IFSC format, holder name`() {
+        val ok = AddBankForm(BankOption("12", "UCO BANK"), "32840110063873", "32840110063873", "UCBA0003284", "AJAY KUMAR", AccountOwner.Self)
         assertThat(ok.problems()).isEmpty()
         assertThat(ok.copy(confirm = "32840110063874").problems()).containsExactly(AddBankForm.Field.Confirm)
         assertThat(ok.copy(ifsc = "UCBA1003284").problems()).containsExactly(AddBankForm.Field.Ifsc)
         assertThat(ok.copy(holder = "A").problems()).containsExactly(AddBankForm.Field.Holder)
-        assertThat(ok.copy(panPhoto = 0, passbookPhoto = 0).problems()).containsExactly(AddBankForm.Field.PanPhoto, AddBankForm.Field.PassbookPhoto)
     }
 
     @Test fun `bank search puts names starting with the query first`() {
@@ -371,16 +370,16 @@ class WalletRepositoryTest {
         assertThat(repo.deleteBank(a.copy(accountNumber = ""))).isInstanceOf(NetworkResult.Failure::class.java)
     }
 
-    @Test fun `add bank goes to payout add-bank with the collection's field names and the retailer's own reg no`() = runTest {
+    @Test fun `add bank goes to payout add-bank with the collection's field names and no document images`() = runTest {
         respond(200, """{"status":true,"message":"Bank added successfully"}""")
-        val form = AddBankForm(BankOption("12", "UCO BANK"), "32840110063873", "32840110063873", "ucba0003284", "ajay kumar", AccountOwner.Self, 3, 3)
-        val a = (repo.addBank(form, byteArrayOf(1, 2, 3), byteArrayOf(4, 5, 6)) as NetworkResult.Success).data
+        val form = AddBankForm(BankOption("12", "UCO BANK"), "32840110063873", "32840110063873", "ucba0003284", "ajay kumar", AccountOwner.Self)
+        val a = (repo.addBank(form) as NetworkResult.Success).data
         assertThat(a.verified).isFalse()
         val req = server.takeRequest()
         assertThat(req.path).isEqualTo("/merchant/payout/add-bank")
         val body = req.body.readUtf8()
-        assertThat(body).contains("name=\"panImage\"; filename=\"panImage.jpg\"")
-        assertThat(body).contains("name=\"passbookImage\"; filename=\"passbookImage.jpg\"")
+        assertThat(body).doesNotContain("panImage")
+        assertThat(body).doesNotContain("passbookImage")
         for (f in listOf("userRegID", "bankName", "accountNumber", "ifscCode", "accountHolderName", "accountType")) assertThat(body).contains("name=\"$f\"")
         assertThat(body).contains("6044")
         assertThat(body).contains("UCBA0003284")
@@ -452,7 +451,7 @@ private open class FakeRepo : WalletRepository {
     }
     override suspend fun bankAccounts(): NetworkResult<List<BankAccount>> = NetworkResult.Success(emptyList(), null)
     override suspend fun bankOptions(): NetworkResult<List<BankOption>> = NetworkResult.Success(emptyList(), null)
-    override suspend fun addBank(form: AddBankForm, pan: ByteArray, passbook: ByteArray): NetworkResult<BankAccount> = NetworkResult.Failure.NoInternet
+    override suspend fun addBank(form: AddBankForm): NetworkResult<BankAccount> = NetworkResult.Failure.NoInternet
     override suspend fun deleteBank(account: BankAccount): NetworkResult<Unit> = NetworkResult.Success(Unit, null)
 }
 
@@ -563,10 +562,10 @@ class WalletViewModelTest {
         val vm = SendMoneyViewModel(repo, FakeLocation())
         vm.onAmount("2000"); vm.proceed()
         assertThat(vm.state.value.otpOpen).isTrue()
-        vm.onOtp("1111"); vm.confirm()
+        vm.onOtp("111111"); vm.confirm()
         assertThat(vm.state.value.otpOpen).isTrue()
         assertThat(vm.state.value.otpError).contains("OTP")
-        vm.onOtp("1234"); vm.confirm()
+        vm.onOtp("123456"); vm.confirm()
         assertThat(vm.state.value.phase).isEqualTo(SendPhase.Sending) // held at least ~2 s, so it's seen
         advanceUntilIdle()
         assertThat(vm.state.value.phase).isEqualTo(SendPhase.Result)
@@ -605,7 +604,7 @@ class WalletViewModelTest {
         loc.on = true; loc.fix = null
         vm.proceed()
         assertThat(vm.state.value.otpOpen).isTrue()
-        vm.onOtp("1234"); vm.confirm(); advanceUntilIdle()
+        vm.onOtp("123456"); vm.confirm(); advanceUntilIdle()
         assertThat(vm.state.value.location).isEqualTo(com.asl.wallet.feature.wallet.ui.LocationNeed.NoFix)
         assertThat(repo.sendKeys).isEmpty() // nothing was sent
         loc.fix = com.asl.wallet.feature.wallet.data.ShopLocation(22.57, 88.36)

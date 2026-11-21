@@ -29,7 +29,7 @@
     <string name="locked_reset">পাসওয়ার্ড রিসেট করুন</string>
     <string name="locked_back">সাইন ইনে ফিরে যান</string>
     <string name="otp_title">নিশ্চিত করুন এটা আপনি</string>
-    <string name="otp_enter">৪ সংখ্যার কোড দিন</string>
+    <string name="otp_enter">৬ সংখ্যার কোড দিন</string>
     <string name="otp_sent">আপনার রেজিস্টার করা মোবাইলে SMS-এ পাঠানো হয়েছে</string>
     <string name="otp_verify">যাচাই করে সাইন ইন করুন</string>
     <string name="otp_resend">আবার কোড পাঠান</string>
@@ -43,7 +43,7 @@
     <string name="forgot_step_mobile">মোবাইল</string>
     <string name="forgot_step_new">নতুন পাসওয়ার্ড</string>
     <string name="forgot_enter_mobile">আপনার রেজিস্টার করা মোবাইল দিন</string>
-    <string name="forgot_send_hint">আমরা SMS-এ ৪ সংখ্যার কোড পাঠাব</string>
+    <string name="forgot_send_hint">আমরা SMS-এ ৬ সংখ্যার কোড পাঠাব</string>
     <string name="forgot_mobile">মোবাইল নম্বর</string>
     <string name="forgot_send">কোড পাঠান</string>
     <string name="forgot_code_sent">কোড আপনার মোবাইলে পাঠানো হয়েছে · ১৫ মিনিট বৈধ</string>
@@ -61,7 +61,7 @@
     <string name="changed_go">সাইন ইনে যান</string>
     <string name="lock_setup_title">আপনার অ্যাপ সুরক্ষিত করুন</string>
     <string name="lock_setup_head">ফোন লক দিয়ে ASL Wallet লক করুন</string>
-    <string name="lock_setup_sub">ফোনের জন্য যে আঙুলের ছাপ, PIN বা প্যাটার্ন ব্যবহার করেন সেটাই</string>
+    <string name="lock_setup_sub">ঐচ্ছিক — ফোনের জন্য যে আঙুলের ছাপ, PIN বা প্যাটার্ন ব্যবহার করেন সেটাই। সেটিংসে যেকোনো সময় চালু বা বন্ধ করতে পারেন।</string>
     <string name="lock_setup_b1">এক ছোঁয়ায় খোলে</string>
     <string name="lock_setup_b1s">ফোনে থাকলে আঙুলের ছাপ বা মুখ</string>
     <string name="lock_setup_b2">আপনি সরে গেলে লক হয়ে যায়</string>
@@ -71,7 +71,7 @@
     <string name="lock_setup_cta">অ্যাপ লক চালু করুন</string>
     <string name="lock_setup_confirm">নিশ্চিত করুন এটা আপনি</string>
     <string name="lock_setup_confirm_sub">ASL Wallet আপনার স্ক্রিন লক ব্যবহার করতে চায়</string>
-    <string name="lock_setup_skip_uat">এখন বাদ দিন (শুধু UAT বিল্ড)</string>
+    <string name="lock_setup_not_now">এখন নয়</string>
     <string name="expired_title">অনুগ্রহ করে আবার সাইন ইন করুন</string>
     <string name="expired_body">আপনার নিরাপত্তার জন্য দীর্ঘ সময় পরে বা অন্য ফোন থেকে সাইন আউট করা হয়েছে।</string>
     <string name="expired_ok">সাইন ইন</string>
@@ -80,6 +80,7 @@
     <string name="err_insecure">সংযোগ নিরাপদ নয়, তাই বন্ধ করা হয়েছে। নেটওয়ার্ক বদলে আবার চেষ্টা করুন।</string>
     <string name="err_unknown">কিছু ভুল হয়েছে। আবার চেষ্টা করুন।</string>
     <string name="err_otp_expired">কোডের সময় শেষ। আবার সাইন ইন করুন।</string>
+    <string name="err_not_retailer">এই অ্যাপটি শুধুমাত্র রিটেইলারদের জন্য। সাইন ইন করতে ডিস্ট্রিবিউটর অ্যাপ ব্যবহার করুন।</string>
     <string name="lock_setup_none_title">এই ফোনে কোনো স্ক্রিন লক নেই</string>
     <string name="lock_setup_none_body">ফোনের সেটিংসে আঙুলের ছাপ, PIN, প্যাটার্ন বা পাসওয়ার্ড সেট করে ফিরে আসুন।</string>
     <string name="lock_setup_open_settings">স্ক্রিন লক সেট করুন</string>

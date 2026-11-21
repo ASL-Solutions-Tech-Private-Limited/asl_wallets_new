@@ -467,8 +467,12 @@ class DmtViewModel @Inject constructor(
     }
 
     companion object {
-        /** Every DMT OTP is 4 digits (customer, recipient and transfer), as in the old app on the same API. */
-        const val OTP_LENGTH = 4
+        /**
+         * Every DMT OTP panel (customer, recipient and transfer) is 6 digits, matching the rest of the app
+         * (user, 21 Nov 2026). The old app used 4 on this API — confirm the DMT provider now sends 6-digit OTPs,
+         * otherwise verification will fail.
+         */
+        const val OTP_LENGTH = 6
         const val OTP_MIN = OTP_LENGTH
         const val OTP_MAX = OTP_LENGTH
         const val RESEND_SECONDS = 30

@@ -112,6 +112,8 @@ internal fun BalanceHero(
     deduct: Boolean = false,
     title: String = stringResource(R.string.w_am_current),
     afterLabel: String = stringResource(R.string.w_am_after),
+    /** Small caption under the "after" row, e.g. to warn that charges are not included. */
+    afterNote: String? = null,
 ) {
     val adding = change
     val c = AslTheme.colors
@@ -128,19 +130,28 @@ internal fun BalanceHero(
             Text(balance?.let { Money.format(countUp(it)) } ?: "₹ —", style = AslTheme.type.amountWallet, color = Color.White)
             AnimatedVisibility(adding != null && balance != null, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
                 val add = adding ?: BigDecimal.ZERO
-                Row(
-                    Modifier.padding(top = 4.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.14f)).padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(afterLabel, style = AslTheme.type.caption, color = Color.White.copy(alpha = 0.85f))
-                    Text("→", style = AslTheme.type.label, color = Color.White)
-                    Text(Money.format(countUp(if (deduct) (balance ?: BigDecimal.ZERO) - add else (balance ?: BigDecimal.ZERO) + add)), style = AslTheme.type.bodyStrong, color = Color.White)
-                    Spacer(Modifier.weight(1f, fill = false))
-                    Text(
-                        (if (deduct) "− " else "+ ") + Money.format(add, showPaise = false), style = AslTheme.type.micro,
-                        color = if (deduct) Color(0xFF4A0B0B) else Color(0xFF0B3D1C),
-                        modifier = Modifier.clip(RoundedCornerShape(50)).background(if (deduct) Color(0xFFFFB4A8) else Color(0xFF7CE0A3)).padding(horizontal = 8.dp, vertical = 3.dp),
-                    )
+                Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(
+                        Modifier.clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.14f)).padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(afterLabel, style = AslTheme.type.caption, color = Color.White.copy(alpha = 0.85f))
+                        Text("→", style = AslTheme.type.label, color = Color.White)
+                        Text(Money.format(countUp(if (deduct) (balance ?: BigDecimal.ZERO) - add else (balance ?: BigDecimal.ZERO) + add)), style = AslTheme.type.bodyStrong, color = Color.White)
+                        Spacer(Modifier.weight(1f, fill = false))
+                        Text(
+                            (if (deduct) "− " else "+ ") + Money.format(add, showPaise = false), style = AslTheme.type.micro,
+                            color = if (deduct) Color(0xFF4A0B0B) else Color(0xFF0B3D1C),
+                            modifier = Modifier.clip(RoundedCornerShape(50)).background(if (deduct) Color(0xFFFFB4A8) else Color(0xFF7CE0A3)).padding(horizontal = 8.dp, vertical = 3.dp),
+                        )
+                    }
+                    if (afterNote != null) Row(
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        modifier = Modifier.padding(start = 2.dp),
+                    ) {
+                        Icon(AslIcons.Info, null, Modifier.size(13.dp), tint = Color.White.copy(alpha = 0.8f))
+                        Text(afterNote, style = AslTheme.type.micro, color = Color.White.copy(alpha = 0.85f))
+                    }
                 }
             }
         }

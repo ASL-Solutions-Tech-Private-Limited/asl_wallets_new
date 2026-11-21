@@ -31,8 +31,12 @@ interface AuthLocalStore {
     suspend fun setLanguageChosen()
     suspend fun isOnboardingSeen(): Boolean
     suspend fun setOnboardingSeen()
+    /** Whether we've already shown the one-time app-lock offer (so we don't offer again). */
     suspend fun isAppLockSetupDone(): Boolean
     suspend fun setAppLockSetupDone()
+    /** Whether the user has turned app lock on. Opt-in: defaults to false. */
+    suspend fun isAppLockEnabled(): Boolean
+    suspend fun setAppLockEnabled(enabled: Boolean)
     /** Removes the profile. Keeps last login ID and flags so the next sign-in is quick. */
     suspend fun clearSession()
 }
@@ -48,6 +52,7 @@ class DataStoreAuthLocalStore @Inject constructor(
     private val langKey = booleanPreferencesKey("language_chosen")
     private val onboardKey = booleanPreferencesKey("onboarding_seen")
     private val lockKey = booleanPreferencesKey("app_lock_setup")
+    private val lockOnKey = booleanPreferencesKey("app_lock_enabled")
     private val ds get() = context.authStore
 
     override suspend fun cachedUser(): User? = ds.data.first()[userKey]?.let { enc ->
@@ -66,5 +71,7 @@ class DataStoreAuthLocalStore @Inject constructor(
     override suspend fun setOnboardingSeen() { ds.edit { it[onboardKey] = true } }
     override suspend fun isAppLockSetupDone() = ds.data.first()[lockKey] == true
     override suspend fun setAppLockSetupDone() { ds.edit { it[lockKey] = true } }
+    override suspend fun isAppLockEnabled() = ds.data.first()[lockOnKey] == true
+    override suspend fun setAppLockEnabled(enabled: Boolean) { ds.edit { it[lockOnKey] = enabled } }
     override suspend fun clearSession() { ds.edit { it.remove(userKey) } }
 }

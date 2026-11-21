@@ -106,11 +106,7 @@ fun BankAccountsScreen(onBack: () -> Unit, onAdd: () -> Unit, vm: BankAccountsVi
 @Composable
 fun AddBankScreen(onBack: () -> Unit, onDone: () -> Unit, onWallet: () -> Unit, vm: AddBankViewModel = hiltViewModel()) {
     val s by vm.state.collectAsStateWithLifecycle()
-    val context = LocalContext.current
     var bankSheet by remember { mutableStateOf(false) }
-    var photoFor by remember { mutableStateOf<DocKind?>(null) }
-    // Photos never outlive this screen.
-    DisposableEffect(Unit) { onDispose { DocPhotos.wipeAll(context) } }
 
     s.added?.let { a ->
         WalletScaffold(stringResource(R.string.w_add_account), null, bottom = {
@@ -146,28 +142,9 @@ fun AddBankScreen(onBack: () -> Unit, onDone: () -> Unit, onWallet: () -> Unit, 
             error = if (Field.Holder in p) stringResource(R.string.w_holder_bad) else null)
         HeaderText(stringResource(R.string.w_whose_account))
         SegmentedControl(listOf(stringResource(R.string.w_own), stringResource(R.string.w_relative)), AccountOwner.entries.indexOf(f.owner), { vm.onOwner(AccountOwner.entries[it]) })
-        DocRow(stringResource(R.string.w_pan_photo), stringResource(R.string.w_pan_photo_sub), f.panPhoto, Field.PanPhoto in p || s.photoError == DocKind.Pan) { photoFor = DocKind.Pan }
-        DocRow(stringResource(R.string.w_passbook_photo), stringResource(R.string.w_passbook_photo_sub), f.passbookPhoto, Field.PassbookPhoto in p || s.photoError == DocKind.Passbook) { photoFor = DocKind.Passbook }
         ErrorBanner(s.error)
     }
     if (bankSheet) BankOptionSheet(s.options, s.optionsLoading, s.optionsError != null, vm::loadOptions, onPick = { vm.onBank(it); bankSheet = false }) { bankSheet = false }
-    photoFor?.let { kind -> PhotoSourceSheet(kind, onPhoto = { b -> vm.onPhoto(kind, b); photoFor = null }) { photoFor = null } }
-}
-
-@Composable
-private fun DocRow(title: String, sub: String, size: Int, error: Boolean, onClick: () -> Unit) {
-    val done = size > 0
-    ListCard {
-        ListRow(
-            title,
-            subtitle = if (done) stringResource(R.string.w_photo_done, "%.1f MB".format(size / 1_000_000f)) else sub,
-            icon = if (done) AslIcons.Check else AslIcons.Upload,
-            iconColors = if (done) AslGradients.success else if (error) AslGradients.failed else null,
-            trailing = { if (done) Text(stringResource(R.string.w_change), style = AslTheme.type.label, color = AslTheme.colors.primary) },
-            onClick = onClick,
-        )
-    }
-    if (error && !done) Text(stringResource(R.string.w_photo_needed), style = AslTheme.type.caption, color = AslTheme.colors.error)
 }
 
 /** 4.29 Searchable list of the server's banks. */
@@ -187,30 +164,3 @@ private fun BankOptionSheet(all: List<BankOption>, loading: Boolean, failed: Boo
     }
 }
 
-/** 4.30 Camera (private cache, never the gallery) or gallery (system picker, no storage permission). */
-@Composable
-private fun PhotoSourceSheet(kind: DocKind, onPhoto: (ByteArray?) -> Unit, onDismiss: () -> Unit) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var file by rememberSaveable { mutableStateOf<String?>(null) }
-    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
-        val f = file?.let(::File)
-        if (ok && f != null) scope.launch { onPhoto(withContext(Dispatchers.IO) { DocPhotos.fromFile(f) }) } else { f?.delete(); onDismiss() }
-    }
-    val gallery = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) scope.launch { onPhoto(withContext(Dispatchers.IO) { DocPhotos.fromUri(context, uri) }) } else onDismiss()
-    }
-    WalletSheet(onDismiss) {
-        Text(stringResource(if (kind == DocKind.Pan) R.string.w_pan_photo else R.string.w_passbook_photo), style = AslTheme.type.title, color = AslTheme.colors.textPrimary)
-        ListCard {
-            ListRow(stringResource(R.string.w_take_photo), subtitle = stringResource(R.string.w_take_photo_sub), icon = AslIcons.Camera, iconColors = AslGradients.Service.Aeps.colors, onClick = {
-                val f = DocPhotos.newFile(context, kind.name.lowercase())
-                file = f.path
-                camera.launch(DocPhotos.uriFor(context, f))
-            }); Divider()
-            ListRow(stringResource(R.string.w_from_gallery), subtitle = stringResource(R.string.w_from_gallery_sub), icon = AslIcons.Upload, iconColors = AslGradients.Service.Wallet.colors, onClick = {
-                gallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            })
-        }
-    }
-}

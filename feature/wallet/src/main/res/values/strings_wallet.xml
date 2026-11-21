@@ -247,6 +247,7 @@
     <!-- Payout form (10 Nov 2026) -->
     <string name="w_po_balance">Wallet balance</string>
     <string name="w_po_after">After payout</string>
+    <string name="w_po_after_note">Before charges · your plan\'s charge is taken on top of this</string>
     <string name="w_po_send_to">Send to</string>
     <string name="w_po_choose_sub">Your own verified bank account</string>
     <string name="w_po_ask">How much do you want to send to your bank?</string>

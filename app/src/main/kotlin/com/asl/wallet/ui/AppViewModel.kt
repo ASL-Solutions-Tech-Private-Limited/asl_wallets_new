@@ -33,6 +33,7 @@ data class AppUiState(
 class AppViewModel @Inject constructor(
     private val prefs: AppPreferences,
     private val appLock: AppLockManager,
+    private val authLocal: com.asl.wallet.feature.auth.data.AuthLocalStore,
     private val healthApi: HealthApi,
     integrityChecker: DeviceIntegrityChecker,
     /** Support line for Help, receipts and AEPS "pending". */
@@ -51,7 +52,10 @@ class AppViewModel @Inject constructor(
 
     init {
         val report = integrityChecker.check(isReleaseBuild = !BuildConfig.DEBUG)
-        _ui.update { it.copy(integrityIssues = report.issues, integrityBlocked = report.blocksPayments(BuildConfig.ALLOW_EMULATOR)) }
+        // Root / tampered / test-keys always block. Emulators are allowed when the flavor opts in (UAT) or on any
+        // debug build (so Live can be tested on an emulator); release builds still block emulators.
+        val allowEmulator = BuildConfig.ALLOW_EMULATOR || BuildConfig.DEBUG
+        _ui.update { it.copy(integrityIssues = report.issues, integrityBlocked = report.blocksPayments(allowEmulator)) }
     }
 
     fun setTheme(mode: ThemeMode) = viewModelScope.launch { prefs.setThemeMode(mode) }
@@ -69,6 +73,20 @@ class AppViewModel @Inject constructor(
     fun lockNow() = appLock.lockNow()
     fun onUnlocked() = appLock.onUnlocked()
     fun checkIdle() = appLock.checkIdle()
+
+    /** App lock is opt-in. This is the saved choice, shown as the Settings toggle. */
+    private val _appLockEnabled = MutableStateFlow(false)
+    val appLockEnabled: StateFlow<Boolean> = _appLockEnabled.asStateFlow()
+
+    init { viewModelScope.launch { _appLockEnabled.value = authLocal.isAppLockEnabled() } }
+
+    /** Turn app lock on or off from Settings: saves the choice and arms/disarms the lock immediately. */
+    fun setAppLock(enabled: Boolean) = viewModelScope.launch {
+        authLocal.setAppLockEnabled(enabled)
+        authLocal.setAppLockSetupDone() // the user has made a choice; don't offer again
+        appLock.enabled = enabled
+        _appLockEnabled.value = enabled
+    }
 
     fun checkConnection() {
         _ui.update { it.copy(connection = ConnectionResult.Checking) }

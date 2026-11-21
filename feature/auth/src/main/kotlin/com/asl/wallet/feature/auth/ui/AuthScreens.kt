@@ -8,6 +8,7 @@ import androidx.activity.compose.BackHandler
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -45,14 +46,19 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
@@ -101,6 +107,7 @@ fun authErrorText(e: AuthError): String = when (e) {
     AuthError.Insecure -> stringResource(R.string.err_insecure)
     AuthError.Unknown -> stringResource(R.string.err_unknown)
     AuthError.OtpSessionExpired -> stringResource(R.string.err_otp_expired)
+    AuthError.NotRetailer -> stringResource(R.string.err_not_retailer)
 }
 
 /** Dark "night sky" header with soft moving lights, used by Splash, Language and Login. */
@@ -300,15 +307,43 @@ fun LoginScreen(
         }
     }
 
-    if (showSessionExpired) {
-        AlertDialog(
-            onDismissRequest = onSessionExpiredShown,
-            icon = { BigIcon(AslIcons.Lock, AslGradients.pending, size = 56.dp) },
-            title = { Text(stringResource(R.string.expired_title), style = AslTheme.type.title, textAlign = TextAlign.Center) },
-            text = { Text(stringResource(R.string.expired_body), style = AslTheme.type.body, textAlign = TextAlign.Center) },
-            confirmButton = { AslButton(stringResource(R.string.expired_ok), onClick = onSessionExpiredShown, compact = true) },
-            containerColor = c.surface,
-        )
+    if (showSessionExpired) SessionExpiredDialog(onSignIn = onSessionExpiredShown)
+}
+
+/** A polished replacement for the stock session-expired alert: a glowing lock badge, clear copy, one primary action. */
+@Composable
+private fun SessionExpiredDialog(onSignIn: () -> Unit) {
+    val c = AslTheme.colors
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { shown = true }
+    val scale by animateFloatAsState(if (shown) 1f else 0.9f, tween(240), label = "scale")
+    val appear by animateFloatAsState(if (shown) 1f else 0f, tween(240), label = "appear")
+    val glow by rememberInfiniteTransition(label = "glow")
+        .animateFloat(0.16f, 0.36f, infiniteRepeatable(tween(1500), RepeatMode.Reverse), label = "glowValue")
+    Dialog(onDismissRequest = onSignIn, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Box(
+            Modifier.fillMaxWidth().padding(horizontal = 28.dp)
+                .graphicsLayer { scaleX = scale; scaleY = scale; alpha = appear }
+                .shadow(24.dp, RoundedCornerShape(28.dp))
+                .clip(RoundedCornerShape(28.dp))
+                .background(c.surface),
+        ) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(contentAlignment = Alignment.Center) {
+                    Box(Modifier.size(100.dp).clip(CircleShape).background(AslGradients.pending.first().copy(alpha = glow)))
+                    Box(Modifier.size(80.dp).clip(CircleShape).background(AslGradients.pending.first().copy(alpha = 0.18f)))
+                    Box(Modifier.size(64.dp).clip(CircleShape).background(Brush.linearGradient(AslGradients.pending)), contentAlignment = Alignment.Center) {
+                        Icon(AslIcons.Lock, null, tint = Color.White, modifier = Modifier.size(32.dp))
+                    }
+                }
+                Spacer(Modifier.height(18.dp))
+                Text(stringResource(R.string.expired_title), style = AslTheme.type.headline, color = c.textPrimary, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(8.dp))
+                Text(stringResource(R.string.expired_body), style = AslTheme.type.body, color = c.textSecondary, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(24.dp))
+                AslPrimaryButton(stringResource(R.string.expired_ok), onClick = onSignIn, modifier = Modifier.fillMaxWidth())
+            }
+        }
     }
 }
 
@@ -480,14 +515,15 @@ fun PasswordChangedScreen(onGoToLogin: () -> Unit) {
 /* -------------------------------------------- App lock setup -------------------------------------------- */
 
 @Composable
-fun AppLockSetupScreen(allowSkip: Boolean, onDone: () -> Unit, vm: AppLockSetupViewModel = hiltViewModel()) {
+fun AppLockSetupScreen(onDone: () -> Unit, vm: AppLockSetupViewModel = hiltViewModel()) {
     val c = AslTheme.colors
     val context = LocalContext.current
     val activity = context.findActivity() as? FragmentActivity
     val secure = SystemUnlock.isDeviceSecure(context)
     val title = stringResource(R.string.lock_setup_confirm)
     val sub = stringResource(R.string.lock_setup_confirm_sub)
-    BackHandler { /* must finish setup */ }
+    // Pressing back here just means "not now" — app lock is optional, never a wall.
+    BackHandler { vm.skip(onDone) }
 
     AuthScaffold(stringResource(R.string.lock_setup_title), onBack = null) {
         BigIcon(AslIcons.Shield, AslGradients.action, modifier = Modifier.align(Alignment.CenterHorizontally))
@@ -502,14 +538,16 @@ fun AppLockSetupScreen(allowSkip: Boolean, onDone: () -> Unit, vm: AppLockSetupV
         }
         if (secure) {
             AslPrimaryButton(stringResource(R.string.lock_setup_cta), icon = AslIcons.Lock, onClick = {
-                activity?.let { act -> SystemUnlock.prompt(act, title, sub) { r -> if (r == UnlockResult.Success) vm.done(onDone) } }
+                activity?.let { act -> SystemUnlock.prompt(act, title, sub) { r -> if (r == UnlockResult.Success) vm.enable(onDone) } }
             })
         } else {
+            // No phone lock: we can't turn app lock on, but we never force it. Offer the shortcut, then let them skip.
             AlertBanner(AlertKind.Pending, stringResource(R.string.lock_setup_none_title), message = stringResource(R.string.lock_setup_none_body))
-            AslPrimaryButton(stringResource(R.string.lock_setup_open_settings), icon = AslIcons.Lock, onClick = {
+            AslButton(stringResource(R.string.lock_setup_open_settings), icon = AslIcons.Lock, style = AslButtonStyle.Outline, modifier = Modifier.fillMaxWidth(), onClick = {
                 context.startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             })
         }
-        if (allowSkip) AslButton(stringResource(R.string.lock_setup_skip_uat), onClick = { vm.done(onDone) }, style = AslButtonStyle.Outline, modifier = Modifier.fillMaxWidth())
+        // Always available: app lock is opt-in.
+        AslButton(stringResource(R.string.lock_setup_not_now), onClick = { vm.skip(onDone) }, style = AslButtonStyle.Outline, modifier = Modifier.fillMaxWidth())
     }
 }

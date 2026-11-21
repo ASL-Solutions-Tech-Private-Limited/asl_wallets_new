@@ -82,7 +82,11 @@
     <string name="pf_theme_system">System</string>
     <string name="pf_sec">Security</string>
     <string name="pf_applock">App lock</string>
-    <string name="pf_applock_sub">Always on · locks after 30 s away or 5 min idle</string>
+    <string name="pf_applock_sub">Ask for your phone lock to open · after 30 s away or 5 min idle</string>
+    <string name="pf_applock_need_title">Set a phone lock first</string>
+    <string name="pf_applock_need_body">App lock uses your phone\'s fingerprint, PIN, pattern or password. This phone has none set. Add one in phone settings, then turn on app lock.</string>
+    <string name="pf_applock_set">Open settings</string>
+    <string name="pf_applock_not_now">Not now</string>
     <string name="pf_screens">Screenshots blocked</string>
     <string name="pf_screens_sub">Always on, to protect customer data</string>
     <string name="pf_about">About</string>

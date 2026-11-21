@@ -82,7 +82,11 @@
     <string name="pf_theme_system">सिस्टम</string>
     <string name="pf_sec">सुरक्षा</string>
     <string name="pf_applock">ऐप लॉक</string>
-    <string name="pf_applock_sub">हमेशा चालू · 30 सेकंड दूर या 5 मिनट खाली रहने पर लॉक</string>
+    <string name="pf_applock_sub">खोलने के लिए फ़ोन लॉक माँगें · 30 सेकंड दूर या 5 मिनट खाली रहने पर</string>
+    <string name="pf_applock_need_title">पहले फ़ोन लॉक सेट करें</string>
+    <string name="pf_applock_need_body">ऐप लॉक आपके फ़ोन के फ़िंगरप्रिंट, PIN, पैटर्न या पासवर्ड का उपयोग करता है। इस फ़ोन में कोई सेट नहीं है। फ़ोन सेटिंग में एक जोड़ें, फिर ऐप लॉक चालू करें।</string>
+    <string name="pf_applock_set">सेटिंग खोलें</string>
+    <string name="pf_applock_not_now">अभी नहीं</string>
     <string name="pf_screens">स्क्रीनशॉट बंद</string>
     <string name="pf_screens_sub">ग्राहक के डेटा की सुरक्षा के लिए हमेशा चालू</string>
     <string name="pf_about">जानकारी</string>

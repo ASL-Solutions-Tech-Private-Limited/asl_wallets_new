@@ -211,10 +211,8 @@ data class AddBankForm(
     val ifsc: String = "",
     val holder: String = "",
     val owner: AccountOwner = AccountOwner.Self,
-    val panPhoto: Int = 0,
-    val passbookPhoto: Int = 0,
 ) {
-    enum class Field { Bank, Account, Confirm, Ifsc, Holder, PanPhoto, PassbookPhoto }
+    enum class Field { Bank, Account, Confirm, Ifsc, Holder }
 
     val confirmMatches: Boolean get() = confirm.isNotEmpty() && confirm == account
 
@@ -224,8 +222,6 @@ data class AddBankForm(
         if (!confirmMatches) add(Field.Confirm)
         if (!Validators.isIfsc(ifsc)) add(Field.Ifsc)
         if (!HOLDER.matches(holder.trim())) add(Field.Holder)
-        if (panPhoto <= 0) add(Field.PanPhoto)
-        if (passbookPhoto <= 0) add(Field.PassbookPhoto)
     }
 
     companion object {

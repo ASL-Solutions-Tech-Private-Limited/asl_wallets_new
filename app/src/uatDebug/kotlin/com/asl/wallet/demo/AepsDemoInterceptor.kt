@@ -23,8 +23,8 @@ import kotlin.random.Random
 /**
  * UAT debug only, and only while [AepsDemo] is on. Answers the AEPS calls inside the app:
  * - `aeps/init` goes to the real server (real banks and providers) and the demo scanner is added to its device list;
- * - status says onboarding and bank checks are done, with the daily 2FA due until it is done once;
- * - 2FA, customer OTP and the transaction are answered here: they never reach the server, so no money moves.
+ * - status says onboarding, bank checks and the daily 2FA are all done, so the gate goes straight to the transaction;
+ * - customer OTP and the transaction are answered here: they never reach the server, so no money moves.
  * Every answer carries `X-ASL-Demo: true`, so Chucker shows it as a demo.
  */
 class AepsDemoInterceptor(private val demo: AepsDemo) : Interceptor {
@@ -43,11 +43,12 @@ class AepsDemoInterceptor(private val demo: AepsDemo) : Interceptor {
             "merchant/aeps/init" -> withDemoScanner(chain.proceed(req))
             "merchant/auth/me" -> withDemoIdentity(chain.proceed(req))
             "merchant/aeps/checkAgentStatus" -> reply(req, ok("Agent status (demo)", buildJsonObject {
-                put("isEkycDone", true); put("isBankEkycDone", true); put("isBioKyc", true); put("isTwoFA", demo.twoFactorDone)
+                // Demo skips the daily 2FA: status always reports it done, so the gate goes straight to the transaction screen.
+                put("isEkycDone", true); put("isBankEkycDone", true); put("isBioKyc", true); put("isTwoFA", true)
                 put("providerId", field("providerId")?.toIntOrNull() ?: 2); put("outletid", "DEMO-OUTLET"); put("pidOptionWadh", ""); put("referenceKey", "DEMO")
                 put("bcAgentData", JsonObject(emptyMap()))
             }))
-            "merchant/aeps/two-factor-authenticate" -> { demo.twoFactorDone = true; reply(req, ok("Daily login successful (demo)", JsonObject(emptyMap()))) }
+            "merchant/aeps/two-factor-authenticate" -> reply(req, ok("Daily login successful (demo)", JsonObject(emptyMap())))
             "merchant/aeps/generate-otp" -> reply(req, ok("OTP sent to the customer (demo: any 6 digits work)", buildJsonObject { put("fpTransactionId", "DEMOFP" + digits(10)) }))
             "merchant/aeps/transaction" -> reply(req, ok("Transaction successful (DEMO: no money moved)", transaction(field("txnType"), field("amount"))))
             // Anything else (onboarding, KYC): a plain demo success, so nothing real is touched.

@@ -1,5 +1,6 @@
 package com.asl.wallet.feature.auth.data
 
+import com.asl.wallet.core.common.session.DeviceIdentity
 import com.asl.wallet.core.common.session.SessionTokens
 import com.asl.wallet.core.common.session.TokenStore
 import com.asl.wallet.core.network.NetworkResult
@@ -32,6 +33,7 @@ class AuthRepositoryImpl @Inject constructor(
     private val json: Json,
     private val tokenStore: TokenStore,
     private val local: AuthLocalStore,
+    private val device: DeviceIdentity,
 ) : AuthRepository {
 
     /**
@@ -39,20 +41,33 @@ class AuthRepositoryImpl @Inject constructor(
      * for at most [PENDING_TTL_MS], and wiped on success, failure to resume, or [clearPending].
      * It is never written to disk or logged. (Backend change requested: otpSessionToken.)
      */
-    private class Pending(val id: LoginId, val password: CharArray, val createdAt: Long)
+    private class Pending(val id: LoginId, val password: CharArray, val userType: String?, val createdAt: Long)
     @Volatile private var pending: Pending? = null
     internal var now: () -> Long = System::currentTimeMillis
 
     override suspend fun login(id: LoginId, password: String): LoginOutcome {
+        // Every login also registers this device for push and identifies the client to the backend.
+        val fcm = device.fcmToken()
+        val deviceId = device.deviceId()
+        val deviceName = device.deviceName()
         val req = when (id) {
-            is LoginId.Mobile -> LoginRequest(phone = id.raw, password = password)
-            is LoginId.Email -> LoginRequest(email = id.raw, password = password)
+            is LoginId.Mobile -> LoginRequest(
+                userid = id.raw, phone = id.raw, password = password,
+                deviceId = deviceId, fcmToken = fcm, deviceType = DEVICE_TYPE, deviceName = deviceName, source = SOURCE,
+            )
+            is LoginId.Email -> LoginRequest(
+                userid = id.raw, email = id.raw, password = password,
+                deviceId = deviceId, fcmToken = fcm, deviceType = DEVICE_TYPE, deviceName = deviceName, source = SOURCE,
+            )
         }
         return when (val r = safeApiCall(json, authenticated = false) { api.login(req) }) {
             is NetworkResult.Success -> {
                 local.saveLastLoginId(id.raw)
-                if (r.data.requiresOtp || r.data.accessToken == null) {
-                    pending = Pending(id, password.toCharArray(), now())
+                // Retailer-only: block a distributor / other role before an OTP is ever sent (the role is already
+                // in the login response). The verify path is gated again in completeSignIn as a safety net.
+                if (isNonRetailerRole(r.data.userType)) LoginOutcome.Failed(AuthError.NotRetailer)
+                else if (r.data.requiresOtp || r.data.accessToken == null) {
+                    pending = Pending(id, password.toCharArray(), r.data.userType, now())
                     LoginOutcome.OtpRequired
                 } else {
                     completeSignIn(r.data)
@@ -64,7 +79,18 @@ class AuthRepositoryImpl @Inject constructor(
 
     override suspend fun verifyOtp(otp: String): LoginOutcome {
         val p = livePending() ?: return LoginOutcome.Failed(AuthError.OtpSessionExpired)
-        val req = VerifyOtpRequest(p.id.raw, String(p.password), otp)
+        val req = VerifyOtpRequest(
+            userid = p.id.raw,
+            phone = (p.id as? LoginId.Mobile)?.raw,
+            password = String(p.password),
+            otp = otp,
+            userType = p.userType,
+            deviceId = device.deviceId(),
+            fcmToken = device.fcmToken(),
+            deviceType = DEVICE_TYPE,
+            deviceName = device.deviceName(),
+            source = SOURCE,
+        )
         return when (val r = safeApiCall(json, authenticated = false) { api.verifyOtp(req) }) {
             is NetworkResult.Success -> {
                 if (r.data.accessToken == null) LoginOutcome.Failed(AuthError.Unknown)
@@ -110,15 +136,32 @@ class AuthRepositoryImpl @Inject constructor(
     private suspend fun completeSignIn(data: LoginData): LoginOutcome {
         val access = data.accessToken ?: return LoginOutcome.Failed(AuthError.Unknown)
         val refresh = data.refreshToken ?: return LoginOutcome.Failed(AuthError.Unknown)
+        // This app is for retailers only. Distributors / super distributors / white-level users have their own app,
+        // so we refuse the sign-in before saving any token or profile. (user, 21 Nov 2026)
+        if (isNonRetailerRole(data.userType)) return LoginOutcome.Failed(AuthError.NotRetailer)
         tokenStore.save(SessionTokens(access, refresh))
         val user = data.data.toUser(data.userType)
         local.saveUser(user)
+        device.onFcmSynced() // the token was just sent with login; don't re-send it needlessly
         return LoginOutcome.SignedIn(user)
     }
 
     companion object {
         const val PENDING_TTL_MS = 5 * 60_000L
+        /** Client identifiers the backend expects on auth requests. */
+        private const val DEVICE_TYPE = "ANDROID"
+        private const val SOURCE = "ASL Payzones"
     }
+}
+
+/**
+ * True for the non-retailer merchant/white-level roles this app must keep out. Matches the backend's own
+ * normalisation (lowercase, strip spaces/_/-). Retailer and an absent/unknown role are allowed, so a retailer is
+ * never locked out by a role-string variation; only the known other roles are blocked.
+ */
+internal fun isNonRetailerRole(userType: String?): Boolean {
+    val n = userType?.lowercase()?.replace(Regex("[\\s_-]+"), "") ?: return false
+    return n in setOf("distributor", "superdistributor", "superdistributer", "whitelevel", "whitelabel", "whitelable")
 }
 
 internal fun UserDto?.toUser(userType: String?): User {

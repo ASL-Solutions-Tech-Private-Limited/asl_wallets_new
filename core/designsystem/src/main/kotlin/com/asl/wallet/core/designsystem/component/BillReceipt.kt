@@ -19,8 +19,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import com.asl.wallet.core.designsystem.icon.AslIcons
 import com.asl.wallet.core.designsystem.receipt.ReceiptDoc
 import com.asl.wallet.core.designsystem.receipt.ReceiptExport
@@ -60,13 +62,17 @@ fun BillReceipt(
 ) {
     val context = LocalContext.current
     var printChoice by remember { mutableStateOf(false) }
+    val slip = androidx.compose.ui.graphics.rememberGraphicsLayer()
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     ReceiptCard(
         shop, doc.title, doc.amount ?: "—", status, doc.rows.map { KeyValue(it.first, it.second) }, modifier,
         footer = doc.footer, statusLabel = doc.status, amountWords = amountWords, barcodeSeed = barcodeSeed, animate = animate, voice = voice,
+        captureLayer = slip,
     ) {
         ReceiptActionBar(
-            onWhatsApp = { ReceiptExport.shareText(context, labels.shareTitle, ReceiptExport.text(shop, doc)) },
-            onSavePdf = { ReceiptExport.sharePdf(context, shop, doc, labels.shareTitle, fileName) },
+            // Share / Save export the exact on-screen slip (image), not a redrawn layout.
+            onWhatsApp = { scope.launch { ReceiptExport.shareReceiptBitmap(context, slip.toImageBitmap().asAndroidBitmap(), labels.shareTitle, fileName.removeSuffix(".pdf") + ".png") } },
+            onSavePdf = { scope.launch { ReceiptExport.shareReceiptBitmapPdf(context, slip.toImageBitmap().asAndroidBitmap(), labels.shareTitle, fileName) } },
             onPrint = { printChoice = true }, onHelp = onHelp, labels = labels.actions,
         )
     }

@@ -25,7 +25,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-const val OTP_LENGTH = 4
+const val OTP_LENGTH = 6
 const val RESEND_SECONDS = 60
 const val OTP_TRIES = 3
 
@@ -306,8 +306,16 @@ class ForgotPasswordViewModel @Inject constructor(
 /* -------------------------------------------- App lock setup -------------------------------------------- */
 
 @HiltViewModel
-class AppLockSetupViewModel @Inject constructor(private val local: AuthLocalStore) : ViewModel() {
-    fun done(onDone: () -> Unit) = viewModelScope.launch { local.setAppLockSetupDone(); onDone() }
+class AppLockSetupViewModel @Inject constructor(
+    private val local: AuthLocalStore,
+    private val appLock: com.asl.wallet.core.security.lock.AppLockManager,
+) : ViewModel() {
+    /** The user turned app lock on from the one-time offer: remember the choice and arm the lock now. */
+    fun enable(onDone: () -> Unit) = viewModelScope.launch {
+        local.setAppLockEnabled(true); local.setAppLockSetupDone(); appLock.enabled = true; onDone()
+    }
+    /** "Not now": record that the offer was shown; leave app lock off. Never forced. */
+    fun skip(onDone: () -> Unit) = viewModelScope.launch { local.setAppLockSetupDone(); onDone() }
 }
 
 /* ---------------------------------------------- Home / session ------------------------------------------ */

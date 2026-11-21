@@ -58,6 +58,7 @@ class SessionManager @Inject constructor(
         val tokens = tokenStore.read()
         val user = local.cachedUser()
         val s = if (tokens != null && user != null) {
+            appLock.enabled = local.isAppLockEnabled()
             appLock.isSessionActive = true
             appLock.lockNow()
             SessionState.SignedIn(user)
@@ -70,6 +71,9 @@ class SessionManager @Inject constructor(
     }
 
     fun onSignedIn(user: User) {
+        // Honour the saved opt-in. A first-time user sees the lock offer right after this (it flips the flag live
+        // when they turn it on); a returning user keeps whatever they chose before.
+        scope.launch { appLock.enabled = local.isAppLockEnabled() }
         appLock.isSessionActive = true
         appLock.onUnlocked()
         _state.value = SessionState.SignedIn(user)

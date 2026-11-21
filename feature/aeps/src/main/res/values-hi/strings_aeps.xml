@@ -170,6 +170,11 @@
     <string name="ae_not_debited">पैसे नहीं कटे</string>
     <string name="ae_try_finger">दूसरी उंगली आज़माएं</string>
     <string name="ae_back_aeps">AEPS पर वापस</string>
+    <string name="ae_withdrawal">निकासी</string>
+    <string name="ae_mini_statement">मिनी स्टेटमेंट</string>
+    <string name="ae_quick_confirm">स्कैन करें और आगे बढ़ें</string>
+    <string name="ae_quick_sub">विवरण जांचें, फिर ग्राहक की उंगली स्कैन करें।</string>
+    <string name="ae_lbl_bank">बैंक</string>
     <string name="ae_pending">बैंक का इंतज़ार</string>
     <string name="ae_pending_sub">यह लेन-देन दोबारा न करें</string>
     <string name="ae_pending_msg">बैंक ने समय पर जवाब नहीं दिया। इस ग्राहक के लिए कुछ और करने से पहले कुछ मिनट बाद AEPS रिपोर्ट देखें।</string>

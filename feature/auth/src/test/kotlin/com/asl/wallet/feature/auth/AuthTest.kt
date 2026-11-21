@@ -10,6 +10,7 @@ import com.asl.wallet.core.security.lock.LockState
 import com.asl.wallet.core.testing.InMemoryTokenStore
 import com.asl.wallet.core.testing.MainDispatcherRule
 import com.asl.wallet.feature.auth.data.AuthApi
+import com.asl.wallet.core.common.session.DeviceIdentity
 import com.asl.wallet.feature.auth.data.AuthLocalStore
 import com.asl.wallet.feature.auth.data.AuthRepository
 import com.asl.wallet.feature.auth.data.AuthRepositoryImpl
@@ -46,7 +47,7 @@ import retrofit2.converter.kotlinx.serialization.asConverterFactory
 private val testJson = Json { ignoreUnknownKeys = true; explicitNulls = false; coerceInputValues = true }
 
 class FakeLocal : AuthLocalStore {
-    var user: User? = null; var lastId: String? = null; var lang = false; var lock = false; var onboarded = false
+    var user: User? = null; var lastId: String? = null; var lang = false; var lock = false; var onboarded = false; var lockOn = false
     override suspend fun cachedUser() = user
     override suspend fun saveUser(user: User) { this.user = user }
     override suspend fun lastLoginId() = lastId
@@ -57,7 +58,15 @@ class FakeLocal : AuthLocalStore {
     override suspend fun setOnboardingSeen() { onboarded = true }
     override suspend fun isAppLockSetupDone() = lock
     override suspend fun setAppLockSetupDone() { lock = true }
+    override suspend fun isAppLockEnabled() = lockOn
+    override suspend fun setAppLockEnabled(enabled: Boolean) { lockOn = enabled }
     override suspend fun clearSession() { user = null }
+}
+
+private object FakeDevice : DeviceIdentity {
+    override fun fcmToken() = "fcm-test"
+    override fun deviceId() = "device-test"
+    override fun deviceName() = "Test Device"
 }
 
 /** Response bodies copied from the real UAT API (trimmed). Note the sensitive fields the app must ignore. */
@@ -66,6 +75,10 @@ private const val LOGIN_OK = """{"status":true,"statusCode":200,"message":"User 
  "userpass":"${'$'}argon2id${'$'}secret","aadharno":"999941057058","panno":"ABCPS1234K","apitoken":"x"},
  "accessToken":"acc-1","refreshToken":"ref-1"}}"""
 private const val LOGIN_OTP = """{"status":true,"statusCode":200,"message":"OTP sent.","data":{"requiresOtp":true,"userType":"Retailer"}}"""
+private const val LOGIN_DISTRIBUTOR = """{"status":true,"statusCode":200,"message":"User login successful.","data":{"requiresOtp":false,"userType":"Super Distributor",
+ "data":{"id":7,"regno":1007,"fname":"Dev","lname":"Roy","phone":"9800000001","email":"dev@example.com","company_name":"Dev Distribution","kyc_status":1},
+ "accessToken":"acc-d","refreshToken":"ref-d"}}"""
+private const val LOGIN_DISTRIBUTOR_OTP = """{"status":true,"statusCode":200,"message":"OTP sent.","data":{"requiresOtp":true,"userType":"Distributor"}}"""
 private const val WRONG_PW = """{"status":false,"statusCode":401,"message":"Invalid credentials. 4 attempt(s) remaining before account lockout."}"""
 
 class AuthRepositoryTest {
@@ -78,7 +91,7 @@ class AuthRepositoryTest {
         server = MockWebServer().apply { start() }
         val api = Retrofit.Builder().baseUrl(server.url("/")).client(OkHttpClient())
             .addConverterFactory(testJson.asConverterFactory("application/json".toMediaType())).build().create(AuthApi::class.java)
-        repo = AuthRepositoryImpl(api, testJson, tokens, local)
+        repo = AuthRepositoryImpl(api, testJson, tokens, local, FakeDevice)
     }
     @After fun tearDown() = server.shutdown()
 
@@ -94,13 +107,13 @@ class AuthRepositoryTest {
         assertThat(tokens.tokens.value).isEqualTo(SessionTokens("acc-1", "ref-1"))
         assertThat(local.lastId).isEqualTo("ajay@example.com")
         val body = server.takeRequest().body.readUtf8()
-        assertThat(body).isEqualTo("""{"email":"ajay@example.com","password":"Test@123"}""") // no phone:null, no usertype
+        assertThat(body).isEqualTo("""{"userid":"ajay@example.com","email":"ajay@example.com","password":"Test@123","device_id":"device-test","fcm_token":"fcm-test","device_type":"ANDROID","device_name":"Test Device","source":"ASL Payzones"}""") // no phone:null
     }
 
-    @Test fun `mobile login sends phone`() = runTest {
+    @Test fun `mobile login sends userid, phone and device info`() = runTest {
         server.enqueue(MockResponse().setBody(LOGIN_OK))
         repo.login(LoginId.Mobile("9800000000"), "pw")
-        assertThat(server.takeRequest().body.readUtf8()).isEqualTo("""{"phone":"9800000000","password":"pw"}""")
+        assertThat(server.takeRequest().body.readUtf8()).isEqualTo("""{"userid":"9800000000","phone":"9800000000","password":"pw","device_id":"device-test","fcm_token":"fcm-test","device_type":"ANDROID","device_name":"Test Device","source":"ASL Payzones"}""")
     }
 
     @Test fun `wrong password keeps the server message from the 401`() = runTest {
@@ -115,15 +128,28 @@ class AuthRepositoryTest {
         assertThat(repo.login(LoginId.Mobile("9800000000"), "bad")).isEqualTo(LoginOutcome.Locked("Account locked. Try again after 30 minutes."))
     }
 
-    @Test fun `otp flow sends user_id, password and otp, then clears the password`() = runTest {
+    @Test fun `otp flow sends userid, phone, otp, userType and device info, then clears the password`() = runTest {
         server.enqueue(MockResponse().setBody(LOGIN_OTP))
         server.enqueue(MockResponse().setBody(LOGIN_OK))
         assertThat(repo.login(LoginId.Mobile("9800000000"), "Test@123")).isEqualTo(LoginOutcome.OtpRequired)
         assertThat(repo.hasPendingOtp()).isTrue()
         assertThat(repo.verifyOtp("1234")).isInstanceOf(LoginOutcome.SignedIn::class.java)
         server.takeRequest()
-        assertThat(server.takeRequest().body.readUtf8()).isEqualTo("""{"user_id":"9800000000","password":"Test@123","otp":"1234"}""")
+        assertThat(server.takeRequest().body.readUtf8()).isEqualTo("""{"userid":"9800000000","phone":"9800000000","password":"Test@123","otp":"1234","userType":"Retailer","device_id":"device-test","fcm_token":"fcm-test","device_type":"ANDROID","device_name":"Test Device","source":"ASL Payzones"}""")
         assertThat(repo.hasPendingOtp()).isFalse()
+    }
+
+    @Test fun `a distributor is refused and no token is saved (retailer-only app)`() = runTest {
+        server.enqueue(MockResponse().setBody(LOGIN_DISTRIBUTOR))
+        assertThat(repo.login(LoginId.Mobile("9800000001"), "pw")).isEqualTo(LoginOutcome.Failed(AuthError.NotRetailer))
+        assertThat(tokens.tokens.value).isNull()
+        assertThat(local.user).isNull()
+    }
+
+    @Test fun `a distributor is blocked before any OTP is sent`() = runTest {
+        server.enqueue(MockResponse().setBody(LOGIN_DISTRIBUTOR_OTP))
+        assertThat(repo.login(LoginId.Mobile("9800000001"), "pw")).isEqualTo(LoginOutcome.Failed(AuthError.NotRetailer))
+        assertThat(repo.hasPendingOtp()).isFalse() // never moved to the OTP step
     }
 
     @Test fun `pending otp expires after 5 minutes`() = runTest {
@@ -244,12 +270,12 @@ class AuthViewModelTest {
         assertThat(LoginViewModel(repo, session(this), local).state.value.loginId).isEqualTo("9876543210")
     }
 
-    @Test fun `typing 4 digits verifies automatically`() = runTest {
+    @Test fun `typing 6 digits verifies automatically`() = runTest {
         repo.verifyResults.add(LoginOutcome.SignedIn(demoUser))
         local.lock = true
         val vm = OtpViewModel(repo, session(this), local)
         vm.events.test {
-            vm.onOtpChange("12a34")
+            vm.onOtpChange("12a3456")
             assertThat(awaitItem()).isEqualTo(AuthEvent.SignedIn(needsLockSetup = false))
         }
     }
@@ -257,10 +283,10 @@ class AuthViewModelTest {
     @Test fun `three wrong codes start a 60 second cool-down`() = runTest {
         repeat(3) { repo.verifyResults.add(LoginOutcome.Failed(AuthError.Server("Invalid OTP"))) }
         val vm = OtpViewModel(repo, session(this), local)
-        repeat(3) { vm.onOtpChange("1111") }
+        repeat(3) { vm.onOtpChange("111111") }
         assertThat(vm.state.value.triesLeft).isEqualTo(0)
         assertThat(vm.state.value.coolDown).isGreaterThan(0)
-        vm.onOtpChange("2222") // ignored during cool-down
+        vm.onOtpChange("222222") // ignored during cool-down
         assertThat(repo.verifyResults).isEmpty()
         advanceTimeBy(61_000)
         assertThat(vm.state.value.triesLeft).isEqualTo(3)
@@ -286,7 +312,7 @@ class AuthViewModelTest {
         val vm = ForgotPasswordViewModel(repo, local)
         vm.onMobile("9876543210"); vm.sendCode()
         assertThat(vm.state.value.step).isEqualTo(ForgotStep.Reset)
-        vm.onOtp("1234"); vm.onNewPassword("password"); vm.onConfirm("password")
+        vm.onOtp("123456"); vm.onNewPassword("password"); vm.onConfirm("password")
         assertThat(vm.state.value.canSave).isFalse() // weak
         vm.onNewPassword("Password1"); vm.onConfirm("Password2")
         assertThat(vm.state.value.canSave).isFalse() // mismatch
@@ -295,11 +321,20 @@ class AuthViewModelTest {
         vm.events.test { vm.save(); assertThat(awaitItem()).isEqualTo(AuthEvent.PasswordReset) }
     }
 
-    @Test fun `restoring a saved session opens locked`() = runTest {
+    @Test fun `restoring a saved session opens locked when app lock is on`() = runTest {
         local.user = demoUser
+        local.lockOn = true // app lock is opt-in; the user turned it on
         val s = session(this, InMemoryTokenStore(SessionTokens("a", "r")))
         assertThat(s.restore()).isEqualTo(SessionState.SignedIn(demoUser))
         assertThat(lock.state.value).isEqualTo(LockState.Locked)
+    }
+
+    @Test fun `restoring a saved session stays unlocked when app lock is off`() = runTest {
+        local.user = demoUser
+        local.lockOn = false // default: opt-in, so no lock is forced
+        val s = session(this, InMemoryTokenStore(SessionTokens("a", "r")))
+        assertThat(s.restore()).isEqualTo(SessionState.SignedIn(demoUser))
+        assertThat(lock.state.value).isEqualTo(LockState.Unlocked)
     }
 
     @Test fun `half-saved session is cleaned up`() = runTest {

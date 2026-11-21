@@ -149,8 +149,10 @@ class ScannerViewModel @Inject constructor(
     init {
         if (session.device == null) viewModelScope.launch {
             val id = prefs.lastDevice()
-            // Default to the last one used, else Mantra L1 (the scanner ASL retailers mostly use).
-            val d = devices.firstOrNull { it.id == id } ?: devices.firstOrNull { it.name.contains("Mantra", true) } ?: devices.firstOrNull()
+            // The UAT demo scanner (if present) wins, so demo mode never trips the "scanner not installed" check.
+            // Otherwise the last one used, else Mantra L1 (the scanner ASL retailers mostly use).
+            val d = devices.firstOrNull { it.packageName == com.asl.wallet.feature.aeps.domain.Pid.SELF_PACKAGE }
+                ?: devices.firstOrNull { it.id == id } ?: devices.firstOrNull { it.name.contains("Mantra", true) } ?: devices.firstOrNull()
             session.device = d; _device.value = d
         }
     }

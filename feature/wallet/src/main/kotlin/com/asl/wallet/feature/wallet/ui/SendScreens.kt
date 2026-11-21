@@ -110,10 +110,18 @@ fun SendMoneyScreen(
             WalletScaffold(title, onBack, secure = true, bottom = {
                 AslPrimaryButton(stringResource(R.string.w_continue), vm::proceed, loading = s.busy && !s.otpOpen)
             }) {
-                val amountError = if (s.showErrors) s.problem?.let { amountProblemText(it, setup.limits) } else null
+                // "Too much" problems (over the max / over the wallet balance) show the moment they type it, so
+                // the red bar always has a reason next to it. "Below minimum" stays quiet until Continue, so it
+                // doesn't nag while they're still typing the first digits.
+                val overProblem = s.problem == com.asl.wallet.feature.wallet.domain.AmountProblem.AboveMax ||
+                    s.problem == com.asl.wallet.feature.wallet.domain.AmountProblem.OverBalance
+                val amountError = s.problem
+                    ?.takeIf { s.showErrors || overProblem }
+                    ?.let { amountProblemText(it, setup.limits) }
                 BalanceHero(
                     setup.balance, s.amount.takeIf { s.problem == null }, Modifier.popIn(0, rise = 16.dp), deduct = true,
                     title = stringResource(R.string.w_po_balance), afterLabel = stringResource(R.string.w_po_after),
+                    afterNote = stringResource(R.string.w_po_after_note),
                 )
                 SectionLabel(stringResource(R.string.w_po_send_to))
                 if (setup.accounts.none { it.verified }) com.asl.wallet.core.designsystem.component.AlertBanner(
@@ -151,7 +159,7 @@ fun SendMoneyScreen(
     }
 }
 
-/** 4.22 Review and 4-digit OTP. Money moves only after "Confirm and send". */
+/** 4.22 Review and 6-digit OTP. Money moves only after "Confirm and send". */
 @Composable
 private fun OtpSheet(s: SendState, vm: SendMoneyViewModel) = WalletSheet(vm::closeOtp, dismissible = false) {
     AslCard { KeyValueList(listOfNotNull(

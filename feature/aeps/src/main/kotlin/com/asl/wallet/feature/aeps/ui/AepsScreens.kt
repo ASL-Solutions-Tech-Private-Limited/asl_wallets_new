@@ -69,7 +69,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
@@ -548,6 +552,14 @@ fun AepsTransactionScreen(
     val capture = rememberRdCapture(vm::onCapture)
     val title = stringResource(R.string.ae_title, s.provider.displayName)
     val scan: () -> Unit = { device?.let { capture(it, null, vm.scanOtp) } ?: run { showScanner = true } }
+    // Quick action from the result screen: a pre-filled dialog, then straight into the scan (AePS always needs a live finger).
+    var quick by remember { mutableStateOf<QuickReq?>(null) }
+    val runQuick: (QuickReq, String) -> Unit = { q, amt ->
+        vm.again(q.type)                       // keep customer + bank, switch type, clear amount
+        if (q.type.needsAmount) vm.onAmount(amt)
+        quick = null
+        if (vm.onScanPressed()) scan()         // validates; above ₹5,000 it routes to the customer OTP first
+    }
 
     when (s.phase) {
         TxnPhase.Processing -> AepsScaffold(title, {}) {
@@ -555,7 +567,10 @@ fun AepsTransactionScreen(
                 listOf(R.string.ae_p_captured, R.string.ae_p_bank, R.string.ae_p_receipt), current = 1)
             AlertBanner(AlertKind.Pending, stringResource(R.string.ae_dont_close))
         }
-        TxnPhase.Result -> ResultScreen(s, shop, onHome, onUseKotak, onCallSupport, onWhatsAppSupport, again = { vm.again() }, newCustomer = { vm.again(keepCustomer = false) }, onType = { vm.again(it) })
+        TxnPhase.Result -> ResultScreen(s, shop, onHome, onUseKotak, onCallSupport, onWhatsAppSupport,
+            again = { vm.again() }, newCustomer = { vm.again(keepCustomer = false) }, onType = { vm.again(it) },
+            onWithdraw = { quick = QuickReq(TxnType.Withdraw, retry = false) },
+            onTryAgain = { quick = QuickReq(s.type, retry = true) })
         TxnPhase.CustomerOtp -> AepsScaffold(title, vm::cancelOtp, right = { ScannerChip(device) { showScanner = true } }, bottom = {
             AslPrimaryButton(stringResource(R.string.ae_verify_scan), { if (vm.otpEntered()) scan() }, enabled = s.otp.length >= 4, icon = AslIcons.Fingerprint)
             AslButton(stringResource(R.string.ae_cancel), vm::cancelOtp, Modifier.fillMaxWidth(), style = AslButtonStyle.Outline)
@@ -605,7 +620,11 @@ fun AepsTransactionScreen(
     }
     if (showScanner) ScannerSheet(scanner.devices, device, scanner::select) { showScanner = false }
     if (showBanks) BankPicker(vm.banks, s.recentBanks, { vm.onBank(it); showBanks = false }) { showBanks = false }
+    quick?.let { q -> QuickTxnDialog(s, q, onConfirm = { amt -> runQuick(q, amt) }, onDismiss = { quick = null }) }
 }
+
+/** A result-screen quick action: [type] to run; [retry] = re-attempt a failed transaction (vs a fresh withdrawal). */
+private data class QuickReq(val type: TxnType, val retry: Boolean)
 
 private fun shortBank(name: String): String = name
     .replace("State Bank of India", "SBI").replace("Punjab National Bank", "PNB").replace("Bank of Baroda", "BoB")
@@ -656,6 +675,7 @@ private fun BankPicker(all: List<CustomerBank>, popular: List<CustomerBank>, onP
 private fun ResultScreen(
     s: TxnState, shop: ShopInfo, onHome: () -> Unit, onUseKotak: () -> Unit, onCall: () -> Unit, onWhatsApp: () -> Unit,
     again: () -> Unit, newCustomer: () -> Unit, onType: (TxnType) -> Unit,
+    onWithdraw: () -> Unit, onTryAgain: () -> Unit,
 ) {
     val context = LocalContext.current
     when (val o = s.outcome) {
@@ -664,6 +684,8 @@ private fun ResultScreen(
             val doc = receiptDoc(r)
             var printChoice by remember { mutableStateOf(false) }
             val shareTitle = stringResource(R.string.ae_receipt_share_title)
+            val slip = rememberGraphicsLayer()
+            val scope = rememberCoroutineScope()
             val actionLabels = listOf(stringResource(R.string.ae_share), stringResource(R.string.ae_pdf), stringResource(R.string.ae_print), stringResource(R.string.ae_help_call))
             AepsScaffold(stringResource(R.string.ae_receipt), onHome, bottom = {
                 AslPrimaryButton(stringResource(R.string.ae_same_again), again, icon = AslIcons.Refresh)
@@ -672,34 +694,29 @@ private fun ResultScreen(
                     AslButton(stringResource(R.string.ae_home), onHome, Modifier.weight(1f), style = AslButtonStyle.Outline, icon = AslIcons.Home)
                 }
             }) {
-                if (r.type == TxnType.Balance) {
-                    Column(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        BigIcon(AslIcons.Check, AslGradients.success, size = 64.dp)
-                        Text("₹ " + (r.bankBalance ?: "—"), style = AslTheme.type.amountDisplay, color = AslTheme.colors.textPrimary)
-                        Text(stringResource(R.string.ae_balance_of, r.bankName, r.customerAadhaarMasked), style = AslTheme.type.caption, color = AslTheme.colors.textSecondary)
-                    }
-                }
                 ReceiptCard(
-                    shop, typeLabel(r.type), r.amount?.let { Money.format(it) } ?: (r.bankBalance?.let { "₹ $it" } ?: ""), Status.Success,
+                    shop, typeLabel(r.type), doc.amount ?: "", Status.Success,
                     doc.rows.map { KeyValue(it.first, it.second) }, footer = doc.footer, statusLabel = stringResource(R.string.ae_success),
                     amountWords = r.amount?.takeIf { it.signum() > 0 }?.let { AmountInWords.english(it) }, animate = true,
                     voice = aepsVoice(r),
+                    // Mini statement prints on the slip itself, not as a separate section below.
+                    statementHeader = doc.statementHeader, statement = doc.statement,
+                    captureLayer = slip,
                 )
-                if (r.type == TxnType.Statement) {
-                    SectionHeader(stringResource(R.string.ae_statement))
-                    if (r.statement.isEmpty()) Text(stringResource(R.string.ae_no_lines), style = AslTheme.type.body, color = AslTheme.colors.textSecondary)
-                    else PassbookTable(doc.statementHeader, doc.statement, listOf(0.8f, 2.4f, 0.5f, 1.3f))
-                }
+                if (r.type == TxnType.Statement && r.statement.isEmpty())
+                    Text(stringResource(R.string.ae_no_lines), style = AslTheme.type.body, color = AslTheme.colors.textSecondary)
                 ReceiptActionBar(
-                    onWhatsApp = { ReceiptExport.shareText(context, shareTitle, ReceiptExport.text(shop, doc)) },
-                    onSavePdf = { ReceiptExport.sharePdf(context, shop, doc, shareTitle, "ASL-AEPS-receipt.pdf") },
+                    // Share / Save export the exact on-screen slip (image), not a redrawn layout.
+                    onWhatsApp = { scope.launch { ReceiptExport.shareReceiptBitmap(context, slip.toImageBitmap().asAndroidBitmap(), shareTitle, "ASL-AEPS-receipt.png") } },
+                    onSavePdf = { scope.launch { ReceiptExport.shareReceiptBitmapPdf(context, slip.toImageBitmap().asAndroidBitmap(), shareTitle, "ASL-AEPS-receipt.pdf") } },
                     onPrint = { printChoice = true },
                     onHelp = onCall,
                     labels = actionLabels,
                 )
-                if (r.type == TxnType.Balance) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AslButton(stringResource(R.string.ae_t_statement), { onType(TxnType.Statement) }, Modifier.weight(1f), style = AslButtonStyle.Outline)
-                    AslButton(stringResource(R.string.ae_t_withdraw), { onType(TxnType.Withdraw) }, Modifier.weight(1f))
+                // After a Balance / Mini-statement enquiry, offer a quick withdrawal (pre-filled dialog, then scan).
+                if (r.type == TxnType.Balance || r.type == TxnType.Statement) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (r.type == TxnType.Balance) AslButton(stringResource(R.string.ae_mini_statement), { onType(TxnType.Statement) }, Modifier.weight(1f), style = AslButtonStyle.Outline)
+                    AslButton(stringResource(R.string.ae_withdrawal), onWithdraw, Modifier.weight(1f), icon = AslIcons.Atm)
                 }
             }
             if (printChoice) PrintChoiceSheet(onDismiss = { printChoice = false }) { thermal ->
@@ -710,8 +727,8 @@ private fun ResultScreen(
         // Failed / Pending print the same bill as Reports (stamped), built from what was entered: no money moved
         // (failed) or the bank hasn't answered (pending).
         is TxnOutcome.Failed -> AepsScaffold(stringResource(R.string.ae_receipt), onHome, bottom = {
-            AslPrimaryButton(stringResource(R.string.ae_try_finger), again, icon = AslIcons.Fingerprint)
-            AslButton(stringResource(R.string.ae_back_aeps), again, Modifier.fillMaxWidth(), style = AslButtonStyle.Outline)
+            AslPrimaryButton(stringResource(R.string.ae_try_again), onTryAgain, icon = AslIcons.Refresh)
+            AslButton(stringResource(R.string.ae_home), onHome, Modifier.fillMaxWidth(), style = AslButtonStyle.Outline, icon = AslIcons.Home)
         }) {
             AttemptBill(s, shop, Status.Failed, stringResource(R.string.ae_s_failed), onCall, listOfNotNull(
                 s.amount?.takeIf { s.type.needsAmount }?.let { stringResource(R.string.ae_amount) to stringResource(R.string.ae_not_debited) },
@@ -736,6 +753,47 @@ private fun ResultScreen(
                 AslButton(stringResource(R.string.ae_back), onHome, Modifier.fillMaxWidth(), style = AslButtonStyle.Outline)
             }
         }
+    }
+}
+
+/**
+ * Quick withdrawal / retry from the result screen: shows the kept customer (read-only) and, for a withdrawal, an
+ * editable amount. Confirming hands back the amount; the caller runs the normal scan flow (AePS needs a live finger).
+ */
+@Composable
+private fun QuickTxnDialog(s: TxnState, req: QuickReq, onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
+    val c = AslTheme.colors
+    var amt by remember { mutableStateOf("") }
+    val needsAmount = req.type.needsAmount
+    val value = Money.parse(amt)
+    val amountOk = !needsAmount || (value != null && value >= TxnState.MIN_AMOUNT && value <= TxnState.MAX_AMOUNT && value.stripTrailingZeros().scale() <= 0)
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = c.surface,
+        title = { Text(stringResource(if (req.retry) R.string.ae_try_again else R.string.ae_t_withdraw), style = AslTheme.type.title, color = c.textPrimary) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(stringResource(R.string.ae_quick_sub), style = AslTheme.type.caption, color = c.textSecondary)
+                ReadOnlyRow(stringResource(R.string.ae_c_aadhaar), Masking.aadhaar(s.aadhaar))
+                ReadOnlyRow(stringResource(R.string.ae_c_mobile), Masking.mobile(s.mobile))
+                ReadOnlyRow(stringResource(R.string.ae_lbl_bank), s.bank?.name ?: "—")
+                if (needsAmount) AslTextField(
+                    amt, { amt = it.filter(Char::isDigit).take(5) }, stringResource(R.string.ae_amount),
+                    keyboardType = KeyboardType.Number, error = if (amt.isNotEmpty() && !amountOk) stringResource(R.string.ae_amount_rule) else null,
+                )
+            }
+        },
+        confirmButton = { AslButton(stringResource(R.string.ae_quick_confirm), { onConfirm(amt) }, enabled = amountOk, compact = true, icon = AslIcons.Fingerprint) },
+        dismissButton = { AslButton(stringResource(R.string.ae_cancel), onDismiss, style = AslButtonStyle.Outline, compact = true) },
+    )
+}
+
+@Composable
+private fun ReadOnlyRow(label: String, value: String) {
+    val c = AslTheme.colors
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.background).padding(horizontal = 12.dp, vertical = 8.dp)) {
+        Text(label, style = AslTheme.type.caption, color = c.textSecondary)
+        Text(value, style = AslTheme.type.bodyStrong, color = c.textPrimary)
     }
 }
 
@@ -783,12 +841,14 @@ private fun PrintChoiceSheet(onDismiss: () -> Unit, onChoose: (thermal: Boolean)
 private fun receiptDoc(r: AepsReceipt): ReceiptDoc = ReceiptDoc(
     title = typeLabel(r.type),
     status = stringResource(R.string.ae_success),
-    amount = r.amount?.let { Money.format(it) },
+    // Balance enquiry has no transaction amount: the account balance is the headline figure.
+    amount = if (r.type == TxnType.Balance) r.bankBalance?.let { "₹ $it" } else r.amount?.let { Money.format(it) },
     rows = listOfNotNull(
         stringResource(R.string.ae_r_aadhaar) to r.customerAadhaarMasked,
         stringResource(R.string.ae_r_mobile) to r.customerMobileMasked,
         stringResource(R.string.ae_r_bank) to r.bankName,
-        r.bankBalance?.let { stringResource(R.string.ae_r_balance) to "₹ $it" },
+        // For a balance enquiry the balance is the headline, so don't repeat it as a row; keep it for withdrawals.
+        r.bankBalance?.takeIf { r.type != TxnType.Balance }?.let { stringResource(R.string.ae_r_balance) to "₹ $it" },
         r.bankRef.takeIf { it.isNotBlank() }?.let { stringResource(R.string.ae_r_ref) to it },
         stringResource(R.string.ae_r_via) to "AEPS · ${r.provider.displayName}",
         r.time.takeIf { it.isNotBlank() }?.let { stringResource(R.string.ae_r_date) to it },

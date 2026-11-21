@@ -541,7 +541,8 @@ class SendMoneyViewModel @Inject constructor(
     }
 
     companion object {
-        const val OTP_LENGTH = 4
+        // Payout confirm OTP: 6 digits, matching every other ASL OTP panel (user, 21 Nov 2026).
+        const val OTP_LENGTH = 6
         const val RESEND_SECONDS = 30
     }
 }
@@ -588,8 +589,6 @@ class BankAccountsViewModel @Inject constructor(private val repo: WalletReposito
 
 // ---------------------------------------------------------------- 4.28–4.31 Add bank account
 
-enum class DocKind { Pan, Passbook }
-
 data class AddBankState(
     val form: AddBankForm = AddBankForm(),
     val options: List<BankOption> = emptyList(),
@@ -598,7 +597,6 @@ data class AddBankState(
     val showErrors: Boolean = false,
     val busy: Boolean = false,
     val error: UiError? = null,
-    val photoError: DocKind? = null,
     val added: BankAccount? = null,
 )
 
@@ -606,9 +604,6 @@ data class AddBankState(
 class AddBankViewModel @Inject constructor(private val repo: WalletRepository) : ViewModel() {
     private val _state = MutableStateFlow(AddBankState())
     val state: StateFlow<AddBankState> = _state.asStateFlow()
-    /** Compressed photos, in memory only; never in saved state or on disk after compression. */
-    private var pan: ByteArray? = null
-    private var passbook: ByteArray? = null
 
     init { loadOptions() }
 
@@ -631,26 +626,16 @@ class AddBankViewModel @Inject constructor(private val repo: WalletRepository) :
     fun onHolder(v: String) = edit { it.copy(holder = v.filter { c -> c.isLetter() || c == ' ' || c == '.' || c == '\'' }.take(100).uppercase()) }
     fun onOwner(o: AccountOwner) = edit { it.copy(owner = o) }
 
-    fun onPhoto(kind: DocKind, bytes: ByteArray?) {
-        if (bytes == null) { _state.update { it.copy(photoError = kind) }; return }
-        when (kind) { DocKind.Pan -> pan = bytes; DocKind.Passbook -> passbook = bytes }
-        _state.update { it.copy(photoError = null) }
-        edit { if (kind == DocKind.Pan) it.copy(panPhoto = bytes.size) else it.copy(passbookPhoto = bytes.size) }
-    }
-
     fun submit() {
         val s = _state.value
         if (s.busy) return
-        val p = pan; val b = passbook
-        if (s.form.problems().isNotEmpty() || p == null || b == null) { _state.update { it.copy(showErrors = true) }; return }
+        if (s.form.problems().isNotEmpty()) { _state.update { it.copy(showErrors = true) }; return }
         _state.update { it.copy(busy = true, error = null) }
         viewModelScope.launch {
-            when (val r = repo.addBank(s.form, p, b)) {
-                is NetworkResult.Success -> { pan = null; passbook = null; _state.update { it.copy(busy = false, added = r.data) } }
+            when (val r = repo.addBank(s.form)) {
+                is NetworkResult.Success -> _state.update { it.copy(busy = false, added = r.data) }
                 is NetworkResult.Failure -> _state.update { it.copy(busy = false, error = r.toUiError()) }
             }
         }
     }
-
-    override fun onCleared() { pan = null; passbook = null }
 }

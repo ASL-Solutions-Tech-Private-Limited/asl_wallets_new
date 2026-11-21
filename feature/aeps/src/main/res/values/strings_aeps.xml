@@ -170,6 +170,11 @@
     <string name="ae_not_debited">Not debited</string>
     <string name="ae_try_finger">Try another finger</string>
     <string name="ae_back_aeps">Back to AEPS</string>
+    <string name="ae_withdrawal">Withdrawal</string>
+    <string name="ae_mini_statement">Mini statement</string>
+    <string name="ae_quick_confirm">Scan &amp; proceed</string>
+    <string name="ae_quick_sub">Confirm the details, then scan the customer\'s finger.</string>
+    <string name="ae_lbl_bank">Bank</string>
     <string name="ae_pending">Waiting for the bank</string>
     <string name="ae_pending_sub">Don\'t repeat this transaction</string>
     <string name="ae_pending_msg">The bank didn\'t answer in time. Check the AEPS report in a few minutes before doing anything else for this customer.</string>

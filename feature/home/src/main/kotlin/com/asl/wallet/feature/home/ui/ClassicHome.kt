@@ -273,7 +273,8 @@ internal fun ClassicHomeTab(
                         }
                     }
 
-                    if (state.user?.isDistributor == true) DistributorSection(vm)
+                    // Distributor section hidden: this app is retailer-only (non-retailers can't sign in). To bring
+                    // it back, restore `if (state.user?.isDistributor == true) DistributorSection(vm)`. (user, 21 Nov 2026)
 
                     // Arrange Home: also in the top bar and in Profile → Settings.
                     AslButton(

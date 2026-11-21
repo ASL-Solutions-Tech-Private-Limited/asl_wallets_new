@@ -316,7 +316,7 @@ class DmtViewModelTest {
         assertThat(vm.state.value.page).isEqualTo(DmtPage.Register)
         vm.onRegName("Rahul Kumar"); vm.register(); advanceUntilIdle()
         assertThat(vm.state.value.otpFor).isEqualTo(OtpFor.Customer)
-        vm.onOtp("4821"); vm.submitOtp(); advanceUntilIdle()
+        vm.onOtp("482100"); vm.submitOtp(); advanceUntilIdle()
         assertThat(repo.verified).containsExactly(OtpPurpose.Customer)
         assertThat(vm.state.value.page).isEqualTo(DmtPage.Customer)
         assertThat(vm.state.value.recipients).containsExactly(nikhil)
@@ -336,7 +336,7 @@ class DmtViewModelTest {
         vm.onMobile(""); vm.pickRecent(vm.state.value.recent.first()); advanceUntilIdle()
         assertThat(vm.state.value.page).isEqualTo(DmtPage.Customer)
         vm.pickRecipient(nikhil); vm.onAmount("100"); vm.review(); advanceUntilIdle()
-        vm.slideToSend(); advanceUntilIdle(); vm.onOtp("1234"); vm.submitOtp(); advanceUntilIdle()
+        vm.slideToSend(); advanceUntilIdle(); vm.onOtp("123456"); vm.submitOtp(); advanceUntilIdle()
         assertThat(recent.data.value[6044L]!!.first().last).isEqualTo("₹ 100 to NIKHIL KUMAR")
         vm.backToCustomer(); vm.changeCustomer(); vm.clearRecent(); advanceUntilIdle()
         assertThat(vm.state.value.recent).isEmpty()
@@ -396,7 +396,7 @@ class DmtViewModelTest {
         vm.onMobile("9876543210"); vm.lookup(); advanceUntilIdle(); vm.startAddRecipient(); advanceUntilIdle()
         vm.onBank(DmtBank("1", "UCO Bank", "UCBA0003284")); vm.onAccount("32840110063874"); vm.onConfirm("32840110063874"); vm.onRecipientMobile("9123456780"); vm.onRecipientName("Nikhil Kumar")
         vm.saveRecipient(); advanceUntilIdle()
-        vm.onOtp("1111"); vm.submitOtp(); advanceUntilIdle()
+        vm.onOtp("111111"); vm.submitOtp(); advanceUntilIdle()
         assertThat(vm.state.value.otpFor).isEqualTo(OtpFor.Recipient)
         assertThat(vm.state.value.page).isEqualTo(DmtPage.AddRecipient)
         assertThat(vm.state.value.otpUiError).isEqualTo(com.asl.wallet.core.network.UiError.Server("Invalid OTP."))
@@ -420,7 +420,7 @@ class DmtViewModelTest {
         vm.onBank(DmtBank("1", "UCO Bank", "UCBA0003284")); vm.onAccount("32840110063874"); vm.onConfirm("32840110063874"); vm.onRecipientMobile("9123456780"); vm.onRecipientName("Nikhil Kumar")
         vm.saveRecipient(); advanceUntilIdle()
         assertThat(vm.state.value.otpFor).isEqualTo(OtpFor.Recipient)
-        vm.onOtp("1234"); vm.submitOtp(); advanceUntilIdle()
+        vm.onOtp("123456"); vm.submitOtp(); advanceUntilIdle()
         assertThat(vm.state.value.page).isEqualTo(DmtPage.RecipientSaved)
     }
 
@@ -450,10 +450,10 @@ class DmtViewModelTest {
         vm.toReview(); advanceUntilIdle()
         vm.slideToSend(); advanceUntilIdle()
         assertThat(vm.state.value.otpFor).isEqualTo(OtpFor.Transfer)
-        vm.onOtp("1111"); vm.submitOtp(); advanceUntilIdle()
+        vm.onOtp("111111"); vm.submitOtp(); advanceUntilIdle()
         assertThat(vm.state.value.otpFor).isEqualTo(OtpFor.Transfer)
         assertThat(vm.state.value.otpError).isEqualTo("Invalid OTP")
-        vm.onOtp("1234"); vm.submitOtp(); runCurrent()
+        vm.onOtp("123456"); vm.submitOtp(); runCurrent()
         assertThat(vm.state.value.page).isEqualTo(DmtPage.Sending) // an instant answer still shows "Sending" for ~2 s
         advanceTimeBy(1_500); runCurrent()
         assertThat(vm.state.value.page).isEqualTo(DmtPage.Sending)
@@ -468,7 +468,7 @@ class DmtViewModelTest {
     @Test fun `a refused transfer (4xx) goes back to the amount with the reason, never a failed receipt`() = runTest {
         val repo = FakeRepo().apply { outcomes += DmtOutcome.Refused("Minimum transfer amount is ₹10") }
         val vm = DmtViewModel(repo, FakeRecent(), FakeUser())
-        vm.toReview(); advanceUntilIdle(); vm.slideToSend(); advanceUntilIdle(); vm.onOtp("1234"); vm.submitOtp(); advanceUntilIdle()
+        vm.toReview(); advanceUntilIdle(); vm.slideToSend(); advanceUntilIdle(); vm.onOtp("123456"); vm.submitOtp(); advanceUntilIdle()
         assertThat(vm.state.value.page).isEqualTo(DmtPage.Amount)
         assertThat(vm.state.value.outcome).isNull()
         assertThat(vm.state.value.error).isEqualTo(com.asl.wallet.core.network.UiError.Server("Minimum transfer amount is ₹10"))

@@ -230,7 +230,7 @@ private fun AppNavHost(nav: NavHostController, vm: AppViewModel, ui: AppUiState,
             )
         }
         composable(Routes.PASSWORD_CHANGED) { PasswordChangedScreen(onGoToLogin = { nav.popBackStack(Routes.LOGIN, inclusive = false) }) }
-        composable(Routes.LOCK_SETUP) { AppLockSetupScreen(allowSkip = BuildConfig.ALLOW_INTEGRITY_BYPASS, onDone = goHome) }
+        composable(Routes.LOCK_SETUP) { AppLockSetupScreen(onDone = goHome) }
         navigation(startDestination = Routes.HOME, route = Routes.MAIN) {
             composable(Routes.HOME) { entry ->
                 val homeVm = mainViewModel(nav, entry)
@@ -291,10 +291,6 @@ private fun AppNavHost(nav: NavHostController, vm: AppViewModel, ui: AppUiState,
                             aepsRow = { AepsSetupRow(onClick = { aepsChooser = true }) },
                             extra = if (BuildConfig.ALLOW_INTEGRITY_BYPASS) {
                                 {
-                                    ListCard {
-                                        ListRow("Foundation showcase", subtitle = "Components, states, security checks (UAT only)", icon = AslIcons.More,
-                                            iconColors = AslGradients.Service.Aeps.colors, onClick = { nav.navigate(Routes.SHOWCASE) })
-                                    }
                                     DemoSwitches(vm.demoToggles)
                                 }
                             } else null,
@@ -342,9 +338,12 @@ private fun AppNavHost(nav: NavHostController, vm: AppViewModel, ui: AppUiState,
         composable(Routes.APP_SETTINGS) {
             val mode by vm.themeMode.collectAsStateWithLifecycle()
             val sound by vm.receiptSound.collectAsStateWithLifecycle()
+            val lockOn by vm.appLockEnabled.collectAsStateWithLifecycle()
+            val secure = remember { com.asl.wallet.core.security.lock.SystemUnlock.isDeviceSecure(nav.context) }
             ProfileSettingsScreen(
                 themeMode = mode, onTheme = vm::setTheme, versionName = BuildConfig.VERSION_NAME, onBack = back,
                 onArrangeHome = { nav.navigate(Routes.ARRANGE_HOME) }, sound = sound, onSound = vm::setReceiptSound,
+                appLockEnabled = lockOn, deviceSecure = secure, onAppLock = vm::setAppLock,
             )
         }
         composable(Routes.HELP) {

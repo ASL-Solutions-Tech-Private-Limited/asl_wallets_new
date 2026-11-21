@@ -40,7 +40,7 @@ sealed interface LoginId {
 
 sealed interface LoginOutcome {
     data class SignedIn(val user: User) : LoginOutcome
-    /** The server wants a 4-digit OTP before issuing tokens. */
+    /** The server wants a 6-digit OTP before issuing tokens. */
     data object OtpRequired : LoginOutcome
     data class Locked(val message: String) : LoginOutcome
     data class Failed(val error: AuthError) : LoginOutcome
@@ -55,6 +55,8 @@ sealed interface AuthError {
     data object Unknown : AuthError
     /** The OTP step lost its pending login (for example after the app was killed). */
     data object OtpSessionExpired : AuthError
+    /** A non-retailer (distributor / super distributor / white-level) tried to sign in. This app is retailer-only. */
+    data object NotRetailer : AuthError
 }
 
 sealed interface ActionResult {

@@ -40,7 +40,6 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.Response
 import java.math.BigDecimal
@@ -77,7 +76,7 @@ interface WalletRepository {
 
     suspend fun bankAccounts(): NetworkResult<List<BankAccount>>
     suspend fun bankOptions(): NetworkResult<List<BankOption>>
-    suspend fun addBank(form: AddBankForm, pan: ByteArray, passbook: ByteArray): NetworkResult<BankAccount>
+    suspend fun addBank(form: AddBankForm): NetworkResult<BankAccount>
     suspend fun deleteBank(account: BankAccount): NetworkResult<Unit>
 }
 
@@ -250,7 +249,7 @@ class WalletRepositoryImpl @Inject constructor(
         }.also { if (it is NetworkResult.Success && it.data.isNotEmpty()) options = it.data }
     }
 
-    override suspend fun addBank(form: AddBankForm, pan: ByteArray, passbook: ByteArray): NetworkResult<BankAccount> {
+    override suspend fun addBank(form: AddBankForm): NetworkResult<BankAccount> {
         // userRegID: only ever the signed-in retailer's own reg no (the server must use the login, not this: reported).
         val regno = currentUser.get().user.value?.regno ?: return NetworkResult.Failure.Unauthorized
         val text = "text/plain".toMediaType()
@@ -262,8 +261,8 @@ class WalletRepositoryImpl @Inject constructor(
             "accountHolderName" to form.holder.trim().uppercase(),
             "accountType" to form.owner.api,
         ).mapValues { it.value.toRequestBody(text) }
-        fun part(name: String, bytes: ByteArray) = MultipartBody.Part.createFormData(name, "$name.jpg", bytes.toRequestBody("image/jpeg".toMediaType()))
-        val r = safeApiCall(json, allowEmptyData = true) { api.addPayoutBank(fields, part("panImage", pan), part("passbookImage", passbook)) }
+        // Document images (PAN / passbook) are intentionally not collected or sent.
+        val r = safeApiCall(json, allowEmptyData = true) { api.addPayoutBank(fields) }
         return when (r) {
             is NetworkResult.Failure -> r
             is NetworkResult.Success -> innerRefusal(r.body())?.let { NetworkResult.Failure.Api(422, "INNER_STATUS", it) }

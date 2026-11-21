@@ -49,6 +49,10 @@ object FcmTokenStore {
         return p.getString(KEY_TOKEN, null)?.takeIf { !p.getBoolean(KEY_SYNCED, false) }
     }
 
+    /** The latest token regardless of the synced flag (login sends the current token every time). */
+    fun current(context: Context): String? =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_TOKEN, null)
+
     fun markSynced(context: Context) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean(KEY_SYNCED, true) }
     }

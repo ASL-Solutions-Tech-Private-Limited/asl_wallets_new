@@ -41,12 +41,36 @@ interface AuthApi {
     suspend fun me(): Response<ApiEnvelope<UserDto>>
 }
 
-/** Exactly one of [phone] / [email] is set; nulls are not sent (explicitNulls = false). */
+/**
+ * [userid] is the login identifier (phone or email); [phone]/[email] echo it by channel and nulls are not sent
+ * (explicitNulls = false). The device fields register this device for push on every login.
+ */
 @Serializable
-data class LoginRequest(val phone: String? = null, val email: String? = null, val password: String)
+data class LoginRequest(
+    val userid: String? = null,
+    val phone: String? = null,
+    val email: String? = null,
+    val password: String,
+    @SerialName("device_id") val deviceId: String? = null,
+    @SerialName("fcm_token") val fcmToken: String? = null,
+    @SerialName("device_type") val deviceType: String? = null,
+    @SerialName("device_name") val deviceName: String? = null,
+    val source: String? = null,
+)
 
 @Serializable
-data class VerifyOtpRequest(@SerialName("user_id") val userId: String, val password: String, val otp: String)
+data class VerifyOtpRequest(
+    val userid: String,
+    val phone: String? = null,
+    val password: String,
+    val otp: String,
+    val userType: String? = null,
+    @SerialName("device_id") val deviceId: String? = null,
+    @SerialName("fcm_token") val fcmToken: String? = null,
+    @SerialName("device_type") val deviceType: String? = null,
+    @SerialName("device_name") val deviceName: String? = null,
+    val source: String? = null,
+)
 
 @Serializable
 data class ResendOtpRequest(@SerialName("user_id") val userId: String, val password: String)

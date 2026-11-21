@@ -6,7 +6,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.Response
 import retrofit2.http.Body
@@ -16,7 +15,6 @@ import retrofit2.http.Header
 import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.PUT
-import retrofit2.http.Part
 import retrofit2.http.PartMap
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -94,13 +92,11 @@ interface WalletApi {
     @POST("merchant/payout/payout-bank-list")
     suspend fun payoutBanks(@Body body: JsonObject = JsonObject(emptyMap())): Response<ApiEnvelope<JsonElement>>
 
-    /** Multipart: userRegID, bankName, accountNumber, ifscCode, accountHolderName, accountType (1 self, 2 relative), panImage, passbookImage. */
+    /** Multipart: userRegID, bankName, accountNumber, ifscCode, accountHolderName, accountType (1 self, 2 relative). Document images are not sent. */
     @Multipart
     @POST("merchant/payout/add-bank")
     suspend fun addPayoutBank(
         @PartMap fields: Map<String, @JvmSuppressWildcards RequestBody>,
-        @Part panImage: MultipartBody.Part,
-        @Part passbookImage: MultipartBody.Part,
     ): Response<ApiEnvelope<JsonElement>>
 
     @POST("merchant/payout/delete-bank")

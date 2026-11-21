@@ -27,10 +27,15 @@ val uatPins = listOf(
     "sha256/diGVwiVYbubAI3RW4hB9xU8e/CH2GnkuvVFZE8zmgzI=",
 ).joinToString(",")
 
-// TODO(live): set when the backend team shares the Live URL and its certificate pins.
-val liveBaseUrl = "https://live-url-not-set.invalid/app/api/v1/"
-val liveHost = "live-url-not-set.invalid"
-val livePins = ""
+// Live: payzones.net (AWS ACM cert). Pins = current leaf, Amazon RSA 2048 M04 intermediate, Amazon Root CA 1
+// (intermediate + root are backups so an ACM leaf renewal can't lock users out).
+val liveBaseUrl = "https://payzones.net/api/v1/"
+val liveHost = "payzones.net"
+val livePins = listOf(
+    "sha256/HsQHnSVpFQ59SxzNc8II0DmGg8iCHjtcD/aVly+5Z+M=",
+    "sha256/G9LNNAql897egYsabashkzUCTEJkWBzgoEtk8X/678c=",
+    "sha256/++MBgDH5WGvL9Bcn5Be30cRcL0f5O+NyoXuWtQdX1aI=",
+).joinToString(",")
 // The app lock must be on in every Live build (checked below). UAT has it off until staging.
 val liveAppLock = true
 
@@ -60,7 +65,7 @@ android {
             // and restore `applicationIdSuffix = ".uat"`.
             versionNameSuffix = "-uat"
             resValue("string", "app_name", "ASL Wallet UAT")
-            buildConfigField("String", "BASE_URL", "\"https://www.testproject.co.in/app/api/v1/\"")
+            buildConfigField("String", "BASE_URL", "\"https://www.testproject.co.in/api/v1/\"")
             buildConfigField("String", "SUPPORT_PHONE", "\"9733815791\"")
             buildConfigField("String", "PIN_HOST", "\"www.testproject.co.in\"")
             buildConfigField("String", "PINS", "\"$uatPins\"")
@@ -197,8 +202,9 @@ dependencies {
     implementation(libs.play.app.update)
     implementation(libs.play.app.update.ktx)
     debugImplementation(libs.androidx.compose.ui.tooling)
-    // API inspector for real-device testing: UAT debug builds only. Release and live builds contain no Chucker code.
-    uatDebugImplementation(libs.chucker)
+    // API inspector (Chucker) for all debug builds — UAT and Live — so testers can capture and share API calls.
+    // Release builds (uatRelease / liveRelease) contain no Chucker code; the `debug` source set isn't compiled into them.
+    debugImplementation(libs.chucker)
 
     testImplementation(project(":core:testing"))
 }

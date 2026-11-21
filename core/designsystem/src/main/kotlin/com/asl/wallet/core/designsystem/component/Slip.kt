@@ -42,6 +42,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
@@ -131,6 +133,11 @@ fun ReceiptCard(
     thanks: String = "Thank you!",
     /** Spoken after the stamp (instant receipts only), if the retailer has the voice on. */
     voice: String? = null,
+    /** Optional passbook/mini-statement printed on the slip itself (e.g. AePS mini statement). */
+    statementHeader: List<String> = emptyList(),
+    statement: List<List<String>> = emptyList(),
+    /** When set, the paper slip records into this layer so the screen can export it as an image (share / save). */
+    captureLayer: androidx.compose.ui.graphics.layer.GraphicsLayer? = null,
     actions: (@Composable () -> Unit)? = null,
 ) {
     val word = statusLabel ?: when (status) { Status.Success -> "Success"; Status.Pending -> "Pending"; Status.Failed -> "Failed"; else -> "" }
@@ -185,11 +192,12 @@ fun ReceiptCard(
             Box(Modifier.fillMaxWidth().padding(top = 13.dp).clipToBounds().padding(start = 14.dp, end = 14.dp, bottom = 12.dp)) {
                 Slip(
                     shop, title, amount, amountWords, rows, footer, thanks, barcodeSeed ?: (title + amount),
-                    word, stampColor, stampScale.value, stampAlpha.value,
-                    Modifier.layout { m, c ->
-                        val p = m.measure(c)
-                        layout(p.width, p.height) { p.place(0, (p.height * feed.value).roundToInt()) }
-                    },
+                    word, stampColor, stampScale.value, stampAlpha.value, statementHeader, statement,
+                    (if (captureLayer != null) Modifier.drawWithContent { captureLayer.record { this@drawWithContent.drawContent() }; drawLayer(captureLayer) } else Modifier)
+                        .layout { m, c ->
+                            val p = m.measure(c)
+                            layout(p.width, p.height) { p.place(0, (p.height * feed.value).roundToInt()) }
+                        },
                 )
             }
         }
@@ -242,7 +250,8 @@ private fun PrinterSlot(busy: Boolean) {
 @Composable
 private fun Slip(
     shop: ShopInfo, title: String, amount: String, words: String?, rows: List<KeyValue>, footer: String, thanks: String, seed: String,
-    word: String, stampColor: Color, stampScale: Float, stampAlpha: Float, modifier: Modifier,
+    word: String, stampColor: Color, stampScale: Float, stampAlpha: Float,
+    statementHeader: List<String>, statement: List<List<String>>, modifier: Modifier,
 ) {
     val shape = remember { TornEdgeShape(14f) }
     val spoken = buildString {
@@ -295,6 +304,26 @@ private fun Slip(
                             r.value, color = Paper.ink, fontSize = 13.5.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End,
                             modifier = Modifier.weight(0.58f).alignByBaseline(),
                         )
+                    }
+                }
+            }
+            // Optional passbook / mini-statement, printed on the slip so it shares and prints as one receipt.
+            if (statement.isNotEmpty()) {
+                val w = listOf(0.8f, 2.4f, 0.5f, 1.3f)
+                TearLine()
+                Row(Modifier.fillMaxWidth().padding(bottom = 2.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    statementHeader.forEachIndexed { i, h ->
+                        Text(h.uppercase(), color = Paper.soft, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.6.sp,
+                            textAlign = if (i >= 2) TextAlign.End else TextAlign.Start, modifier = Modifier.weight(w.getOrElse(i) { 1f }))
+                    }
+                }
+                statement.forEach { cells ->
+                    DotRule()
+                    Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        cells.forEachIndexed { i, cell ->
+                            Text(cell, color = Paper.ink, fontSize = 11.sp, lineHeight = 15.sp, fontWeight = if (i >= 2) FontWeight.SemiBold else FontWeight.Normal,
+                                textAlign = if (i >= 2) TextAlign.End else TextAlign.Start, modifier = Modifier.weight(w.getOrElse(i) { 1f }))
+                        }
                     }
                 }
             }

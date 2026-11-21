@@ -3,6 +3,9 @@ package com.asl.wallet.feature.reports.ui
 import com.asl.wallet.core.designsystem.component.keyboardAware
 import androidx.compose.foundation.layout.imePadding
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,6 +27,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DatePicker
@@ -52,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -112,6 +117,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.math.BigDecimal
+import java.math.RoundingMode
 import java.text.DateFormat
 import java.util.Date
 
@@ -244,6 +250,71 @@ private fun TotalTiles(tiles: List<Triple<String, String, List<Color>>>) {
                 Text(value, style = AslTheme.type.title, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(label, style = AslTheme.type.micro, color = Color.White.copy(alpha = 0.9f))
             }
+        }
+    }
+}
+
+/** A rupee amount that rolls up from zero when it first appears (or the period changes). */
+@Composable
+private fun animatedRupees(target: BigDecimal?): String {
+    if (target == null) return "—"
+    val end = target.toFloat()
+    val anim = remember(target) { Animatable(0f) }
+    LaunchedEffect(target) { anim.animateTo(end, tween(750, easing = FastOutSlowInEasing)) }
+    val shown = if (anim.value >= end) target else BigDecimal(anim.value.toDouble()).setScale(2, RoundingMode.HALF_UP)
+    return Money.format(shown)
+}
+
+/**
+ * Money-in / money-out tiles for the ledger: each has a direction icon and a rolling amount, so a
+ * shopkeeper sees "green = came in, red = went out" at a glance without reading the labels.
+ */
+@Composable
+private fun MoneyFlowTiles(moneyIn: BigDecimal?, moneyOut: BigDecimal?) {
+    if (moneyIn == null && moneyOut == null) return
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        FlowTile(Modifier.weight(1f), AslIcons.ArrowDown, animatedRupees(moneyIn), stringResource(R.string.rp_money_in), AslGradients.success)
+        FlowTile(Modifier.weight(1f), AslIcons.ArrowUp, animatedRupees(moneyOut), stringResource(R.string.rp_money_out), AslGradients.failed)
+    }
+}
+
+@Composable
+private fun FlowTile(modifier: Modifier, icon: ImageVector, value: String, label: String, colors: List<Color>) {
+    Column(modifier.clip(RoundedCornerShape(16.dp)).background(Brush.linearGradient(colors)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(Modifier.size(30.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.22f)), contentAlignment = Alignment.Center) {
+            Icon(icon, null, tint = Color.White, modifier = Modifier.size(18.dp))
+        }
+        Text(value, style = AslTheme.type.title, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(label, style = AslTheme.type.micro, color = Color.White.copy(alpha = 0.92f))
+    }
+}
+
+/** A friendly, always-positive summary of this period's activity — encouragement, never a number that can go negative. */
+@Composable
+private fun LedgerHighlight(moneyIn: BigDecimal?, moneyOut: BigDecimal?, count: Int?) {
+    val present = listOfNotNull(moneyIn, moneyOut)
+    val handled = present.takeIf { it.isNotEmpty() }?.fold(BigDecimal.ZERO) { a, b -> a + b }
+    val n = count ?: 0
+    val c = AslTheme.colors
+    val title = when {
+        n <= 0 -> R.string.rp_motivate_none
+        n < 6 -> R.string.rp_motivate_low
+        n < 16 -> R.string.rp_motivate_mid
+        else -> R.string.rp_motivate_high
+    }
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Brush.linearGradient(c.heroGradient)).padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Box(Modifier.size(46.dp).clip(RoundedCornerShape(14.dp)).background(Color.White.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
+            Icon(AslIcons.Earnings, null, tint = Color.White, modifier = Modifier.size(24.dp))
+        }
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(title), style = AslTheme.type.title, color = Color.White)
+            Text(
+                if (handled != null) stringResource(R.string.rp_handled, n, animatedRupees(handled)) else stringResource(R.string.rp_handled_empty),
+                style = AslTheme.type.caption, color = Color.White.copy(alpha = 0.9f),
+            )
         }
     }
 }
@@ -381,10 +452,8 @@ fun LedgerScreen(shop: ShopInfo, onBack: () -> Unit, vm: LedgerViewModel = hiltV
                     ChoiceChips(listOf(stringResource(R.string.rp_all), stringResource(R.string.rp_money_in), stringResource(R.string.rp_money_out)), s.ledgerType.ordinal, { vm.setType(LedgerType.entries[it]) })
                     PeriodRow(s.period, s.summary?.count?.let { stringResource(R.string.rp_entries, it) }) { filters = true }
                     val t = s.summary?.totals.orEmpty().toMap()
-                    TotalTiles(listOfNotNull(
-                        t[TotalKind.MoneyIn]?.let { Triple(rupees(it), stringResource(R.string.rp_money_in), AslGradients.success) },
-                        t[TotalKind.MoneyOut]?.let { Triple(rupees(it), stringResource(R.string.rp_money_out), AslGradients.failed) },
-                    ))
+                    LedgerHighlight(t[TotalKind.MoneyIn], t[TotalKind.MoneyOut], s.summary?.count)
+                    MoneyFlowTiles(t[TotalKind.MoneyIn], t[TotalKind.MoneyOut])
                     RefreshBanner(s.error, s.loadedAt, s.items.isNotEmpty(), vm::refresh)
                 }
             }
@@ -402,13 +471,24 @@ fun LedgerScreen(shop: ShopInfo, onBack: () -> Unit, vm: LedgerViewModel = hiltV
 @Composable
 private fun LedgerRow(e: LedgerEntry, onClick: () -> Unit) {
     val c = AslTheme.colors
-    Row(Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+    val tone = if (e.isCredit) c.success else c.error
+    // Each row fades and lifts into place when it first appears (and as it scrolls into view).
+    val appear = remember(e.id) { Animatable(0f) }
+    LaunchedEffect(e.id) { appear.animateTo(1f, tween(320, easing = FastOutSlowInEasing)) }
+    Row(
+        Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick).padding(vertical = 10.dp)
+            .graphicsLayer { alpha = appear.value; translationY = (1f - appear.value) * 22f },
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(Modifier.size(38.dp).clip(CircleShape).background(tone.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+            Icon(if (e.isCredit) AslIcons.ArrowDown else AslIcons.ArrowUp, null, tint = tone, modifier = Modifier.size(20.dp))
+        }
         Column(Modifier.weight(1f)) {
             Text(e.description, style = AslTheme.type.body.copy(fontWeight = AslTheme.type.label.fontWeight), color = c.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(listOfNotNull(e.time, e.reference?.let { "Ref $it" }).joinToString(" · "), style = AslTheme.type.caption, color = c.textSecondary)
+            Text(listOfNotNull(e.time, e.reference?.let { "Ref $it" }).joinToString(" · "), style = AslTheme.type.caption, color = c.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Column(horizontalAlignment = Alignment.End) {
-            Text((if (e.isCredit) "+ " else "− ") + rupees(e.amount), style = AslTheme.type.label, color = if (e.isCredit) c.success else c.error)
+            Text((if (e.isCredit) "+ " else "− ") + rupees(e.amount), style = AslTheme.type.label, color = tone)
             e.closing?.let { Text(stringResource(R.string.rp_bal, rupees(it)), style = AslTheme.type.caption, color = c.textSecondary) }
         }
     }
@@ -444,7 +524,7 @@ private fun LedgerEntryPage(s: EntryState, shop: ShopInfo, onBack: () -> Unit) {
         AslCard { KeyValueList(rows) }
         if (s.loading) SkeletonRow()
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AslButton(stringResource(R.string.rp_share), { ReceiptExport.shareText(context, shareTitle, ReceiptExport.text(shop, doc)) }, Modifier.weight(1f), style = AslButtonStyle.Outline, icon = AslIcons.Share)
+            AslButton(stringResource(R.string.rp_share), { ReceiptExport.shareReceiptImage(context, shop, doc, shareTitle, "ASL-ledger-${e.id}.png") }, Modifier.weight(1f), style = AslButtonStyle.Outline, icon = AslIcons.Share)
             AslButton(stringResource(R.string.rp_save_pdf), { ReceiptExport.sharePdf(context, shop, doc, shareTitle, "ASL-ledger-${e.id}.pdf") }, Modifier.weight(1f), style = AslButtonStyle.Outline, icon = AslIcons.Document)
         }
     }
@@ -562,7 +642,7 @@ private fun RowDetailPage(r: ReportRow, shop: ShopInfo, vm: ReportViewModel) {
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Action(stringResource(R.string.rp_share), AslIcons.Chat, AslGradients.Service.Upi.colors) { ReceiptExport.shareText(context, shareTitle, ReceiptExport.text(shop, doc)) }
+            Action(stringResource(R.string.rp_share), AslIcons.Chat, AslGradients.Service.Upi.colors) { ReceiptExport.shareReceiptImage(context, shop, doc, shareTitle, "ASL-${r.kind.name.lowercase()}-${r.txnId.filter(Char::isLetterOrDigit).take(24)}.png") }
             Action(stringResource(R.string.rp_save_pdf), AslIcons.Document, AslGradients.Service.Bills.colors) {
                 ReceiptExport.sharePdf(context, shop, doc, shareTitle, "ASL-${r.kind.name.lowercase()}-${r.txnId.filter(Char::isLetterOrDigit).take(24)}.pdf")
             }

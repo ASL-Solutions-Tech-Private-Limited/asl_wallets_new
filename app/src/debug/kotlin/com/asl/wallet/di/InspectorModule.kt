@@ -19,7 +19,7 @@ import okhttp3.Response
 import okio.ByteString
 
 /**
- * UAT debug only (this source set is not in release or live builds).
+ * Any debug build (UAT and Live), never release — this `debug` source set is not compiled into release builds.
  * Chucker records API calls so testers can see and share them. Everything stored is redacted first:
  * secrets removed, personal numbers masked (see [LogRedactor]). Kept for one day.
  */

@@ -82,7 +82,11 @@
     <string name="pf_theme_system">সিস্টেম</string>
     <string name="pf_sec">নিরাপত্তা</string>
     <string name="pf_applock">অ্যাপ লক</string>
-    <string name="pf_applock_sub">সবসময় চালু · ৩০ সেকেন্ড দূরে বা ৫ মিনিট অলস থাকলে লক</string>
+    <string name="pf_applock_sub">খুলতে ফোন লক চাইবে · ৩০ সেকেন্ড দূরে বা ৫ মিনিট অলস থাকলে</string>
+    <string name="pf_applock_need_title">আগে ফোন লক সেট করুন</string>
+    <string name="pf_applock_need_body">অ্যাপ লক আপনার ফোনের আঙুলের ছাপ, PIN, প্যাটার্ন বা পাসওয়ার্ড ব্যবহার করে। এই ফোনে কোনোটি সেট করা নেই। ফোন সেটিংসে একটি যোগ করুন, তারপর অ্যাপ লক চালু করুন।</string>
+    <string name="pf_applock_set">সেটিংস খুলুন</string>
+    <string name="pf_applock_not_now">এখন নয়</string>
     <string name="pf_screens">স্ক্রিনশট বন্ধ</string>
     <string name="pf_screens_sub">গ্রাহকের তথ্য রক্ষায় সবসময় চালু</string>
     <string name="pf_about">সম্পর্কে</string>

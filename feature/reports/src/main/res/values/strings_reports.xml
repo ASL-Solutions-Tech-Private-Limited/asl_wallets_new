@@ -28,6 +28,13 @@
     <string name="rp_refunded">Refunded</string>
     <string name="rp_today">Today</string>
     <string name="rp_entries">%1$d entries</string>
+    <!-- ledger motivation card -->
+    <string name="rp_motivate_none">Your wallet activity</string>
+    <string name="rp_motivate_low">Good start! 👍</string>
+    <string name="rp_motivate_mid">Busy period 💪</string>
+    <string name="rp_motivate_high">You\'re on fire! 🔥</string>
+    <string name="rp_handled">%2$s across %1$d transactions</string>
+    <string name="rp_handled_empty">Your transactions will show here</string>
     <string name="rp_count_amount">%1$d · %2$s</string>
     <string name="rp_count">%1$d</string>
     <string name="rp_bal">Bal %1$s</string>

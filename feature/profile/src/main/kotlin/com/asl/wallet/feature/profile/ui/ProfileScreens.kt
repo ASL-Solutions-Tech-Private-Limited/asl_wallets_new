@@ -537,6 +537,9 @@ fun SettingsScreen(
     themeMode: ThemeMode, onTheme: (ThemeMode) -> Unit, versionName: String, onBack: () -> Unit, onArrangeHome: (() -> Unit)? = null,
     sound: com.asl.wallet.core.designsystem.component.ReceiptSound = com.asl.wallet.core.designsystem.component.ReceiptSound(),
     onSound: (com.asl.wallet.core.designsystem.component.ReceiptSound) -> Unit = {},
+    appLockEnabled: Boolean = false,
+    deviceSecure: Boolean = true,
+    onAppLock: (Boolean) -> Unit = {},
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val langs = listOf("en" to "English", "hi" to "हिन्दी", "bn" to "বাংলা")
@@ -579,10 +582,30 @@ fun SettingsScreen(
         }
         Text(stringResource(R.string.pf_sound_note), style = AslTheme.type.caption, color = AslTheme.colors.textSecondary)
         SectionHeader(stringResource(R.string.pf_sec))
-        // App lock is mandatory in this app (money app; set up at first sign-in), so it is shown, not toggled.
+        // App lock is opt-in (user, 21 Nov 2026): a real toggle. Turning it on needs a phone screen lock; if the
+        // phone has none, we point the user to set one instead of silently failing. Never forced.
+        var askSetLock by remember { mutableStateOf(false) }
         ListCard {
-            ListRow(stringResource(R.string.pf_applock), subtitle = stringResource(R.string.pf_applock_sub), icon = AslIcons.Lock, trailing = { StatusPill(stringResource(R.string.pf_active), Status.Success) }); Divider()
+            val toggle: (Boolean) -> Unit = { want -> if (want && !deviceSecure) askSetLock = true else onAppLock(want) }
+            ListRow(stringResource(R.string.pf_applock), subtitle = stringResource(R.string.pf_applock_sub), icon = AslIcons.Lock,
+                trailing = { androidx.compose.material3.Switch(appLockEnabled, toggle) }, onClick = { toggle(!appLockEnabled) }); Divider()
             ListRow(stringResource(R.string.pf_screens), subtitle = stringResource(R.string.pf_screens_sub), icon = AslIcons.Shield, trailing = null)
+        }
+        if (askSetLock) {
+            val c = AslTheme.colors
+            AlertDialog(
+                onDismissRequest = { askSetLock = false },
+                containerColor = c.surface,
+                title = { Text(stringResource(R.string.pf_applock_need_title), style = AslTheme.type.title, color = c.textPrimary) },
+                text = { Text(stringResource(R.string.pf_applock_need_body), style = AslTheme.type.body, color = c.textSecondary) },
+                confirmButton = {
+                    AslButton(stringResource(R.string.pf_applock_set), {
+                        askSetLock = false
+                        context.startActivity(android.content.Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                    }, compact = true, icon = AslIcons.Lock)
+                },
+                dismissButton = { TextButton({ askSetLock = false }) { Text(stringResource(R.string.pf_applock_not_now)) } },
+            )
         }
         SectionHeader(stringResource(R.string.pf_about))
         AslCard { KeyValueList(listOf(KeyValue(stringResource(R.string.pf_app_version), versionName))) }

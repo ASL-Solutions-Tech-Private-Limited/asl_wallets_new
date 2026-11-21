@@ -287,8 +287,8 @@ class AddMoneyDemoServer(
         const val EMAIL = "demo.retailer@example.com"
         const val PHONE = "9999999999"
         const val UDF1 = "100001"
-        const val RETURN_URL = "https://www.testproject.co.in/app/api/v1/payments/payu/success"
-        const val FAIL_URL = "https://www.testproject.co.in/app/api/v1/payments/payu/failure"
+        const val RETURN_URL = "https://www.testproject.co.in/api/v1/payments/payu/success"
+        const val FAIL_URL = "https://www.testproject.co.in/api/v1/payments/payu/failure"
         const val V2 = "V2"
         private const val LOOKUP_HASH = "lookup_api_hash"
         private val PAYMENT_HASHES = setOf("payment_hash", "payment_source", "si_payment_source", "tpv_payment_source")

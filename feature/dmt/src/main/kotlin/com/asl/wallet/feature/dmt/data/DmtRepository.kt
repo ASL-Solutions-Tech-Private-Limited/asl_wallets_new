@@ -49,6 +49,8 @@ interface DmtRepository {
     suspend fun banks(): NetworkResult<List<DmtBank>>
     /** Paid (₹ 3). Returns the account holder's name from the bank. */
     suspend fun checkName(form: RecipientForm): NetworkResult<String>
+    /** Paid (₹ 3). Verifies an already-saved recipient against the bank; returns the account holder's name. */
+    suspend fun verifyRecipient(recipient: Recipient): NetworkResult<String>
     /** Saves the recipient; the server then sends an OTP to the recipient's mobile to confirm it. */
     suspend fun addRecipient(customerMobile: String, form: RecipientForm): NetworkResult<Unit>
     /** null when the server has no charges API yet. */
@@ -102,14 +104,20 @@ class DmtRepositoryImpl @Inject constructor(private val api: DmtApi, private val
         }.also { if (it is NetworkResult.Success && it.data.isNotEmpty()) bankCache = it.data }
     }
 
-    override suspend fun checkName(form: RecipientForm): NetworkResult<String> {
-        val r = safeApiCall(json) { api.checkName(NameCheckRequest(form.account, form.ifsc.uppercase(), form.mobile, form.bank!!.name, isExist = 0)) }
-        return when (r) {
+    override suspend fun checkName(form: RecipientForm): NetworkResult<String> =
+        // isExist = 0: a new account being added.
+        nameCheck(NameCheckRequest(form.account, form.ifsc.uppercase(), form.mobile, form.bank!!.name, isExist = 0))
+
+    override suspend fun verifyRecipient(recipient: Recipient): NetworkResult<String> =
+        // isExist = 1: an account already saved to the beneficiary list.
+        nameCheck(NameCheckRequest(recipient.accountNumber, recipient.ifsc.uppercase(), recipient.mobile.orEmpty(), recipient.bankName, isExist = 1))
+
+    private suspend fun nameCheck(req: NameCheckRequest): NetworkResult<String> =
+        when (val r = safeApiCall(json) { api.checkName(req) }) {
             is NetworkResult.Success -> innerFailure(r.data) ?: readName(r.data)?.let { NetworkResult.Success(DmtRules.cleanName(it), r.message) }
                 ?: NetworkResult.Failure.Api(422, "NAME_EMPTY", r.message?.let(::safeServerMessage) ?: "The bank didn't return a name.")
             is NetworkResult.Failure -> r
         }
-    }
 
     override suspend fun addRecipient(customerMobile: String, form: RecipientForm) = checked {
         api.addRecipient(

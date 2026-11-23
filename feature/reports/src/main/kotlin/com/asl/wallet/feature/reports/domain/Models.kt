@@ -120,6 +120,8 @@ enum class ReportKind(
     val complaintMax: Int,
     /** mATM and PAN refuse a start date more than 3 months back. */
     val lookbackLimited: Boolean = false,
+    /** This report is a POST with a JSON body (filters + scope) instead of a GET with query params. */
+    val usesPost: Boolean = false,
 ) {
     Recharge("merchant/recharge-report", "status", "FAILED", "merchant/recharge-report/complain", 100),
     Payout("merchant/payout-report", "tranStatus", "FAILED", "merchant/payout-report/complain", 250),
@@ -133,6 +135,8 @@ enum class ReportKind(
     Pan("merchant/pan-report", null, null, "merchant/pan-report/complain", 250, lookbackLimited = true),
     /** Wallet top-ups by PayU. Like the PayU routes it has no `/app` prefix (UAT, 10 Nov 2026), so the path is absolute. */
     AddMoney("/api/v1/merchant/add-money-report", null, null, null, 0),
+    /** BBPS bill payments. A POST with a filter body + `scope: self` (user, 23 Nov 2026). Complaints endpoint TBD. */
+    Bbps("merchant/bbps-report", "tranStatus", "FAILED", null, 0, usesPost = true),
     ;
 
     val hasStatusFilter: Boolean get() = statusParam != null
@@ -144,6 +148,8 @@ enum class ReportKind(
         return when (this) {
             // ASL txn IDs are 16 characters; mobile and DTH numbers are 10–12.
             Recharge -> if (t.length >= 14) "tranId" else "rechargeNo"
+            // BBPS: a long id is the transaction id, else the consumer/bill number.
+            Bbps -> if (t.length >= 14) "tranId" else "rechargeNo"
             Payout, Pan -> "servid"
             AddMoney -> "search"
             Aeps, Matm -> if (digits && t.length == 12) "bankRrn" else "tranId"

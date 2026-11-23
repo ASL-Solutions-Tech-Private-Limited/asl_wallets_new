@@ -28,6 +28,10 @@ interface ReportsApi {
     @GET
     suspend fun report(@Url path: String, @QueryMap query: Map<String, String>): Response<ApiEnvelope<List<JsonObject>>>
 
+    /** POST reports (BBPS): the filters + scope go in a JSON body. */
+    @POST
+    suspend fun reportPost(@Url path: String, @Body body: JsonObject): Response<ApiEnvelope<List<JsonObject>>>
+
     @POST
     suspend fun complain(@Url path: String, @Body body: ComplainRequest): Response<ApiEnvelope<JsonElement>>
 

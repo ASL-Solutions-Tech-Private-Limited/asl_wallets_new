@@ -171,6 +171,7 @@ fun kindName(k: ReportKind): String = stringResource(when (k) {
     ReportKind.Matm -> R.string.rp_kind_matm
     ReportKind.Pan -> R.string.rp_kind_pan
     ReportKind.AddMoney -> R.string.rp_kind_add_money
+    ReportKind.Bbps -> R.string.rp_kind_bbps
 })
 
 /** Classic look: the old app's report icons. */
@@ -182,6 +183,7 @@ private fun kindArt(k: ReportKind): Int = when (k) {
     ReportKind.Matm -> DS.drawable.classic_ic_matm_report
     ReportKind.Pan -> DS.drawable.classic_ic_new_pan_a
     ReportKind.AddMoney -> DS.drawable.classic_ic_wallet_menu
+    ReportKind.Bbps -> DS.drawable.classic_ic_bbps_report
 }
 
 private fun kindIcon(k: ReportKind): Pair<ImageVector, List<Color>> = when (k) {
@@ -192,6 +194,7 @@ private fun kindIcon(k: ReportKind): Pair<ImageVector, List<Color>> = when (k) {
     ReportKind.Matm -> AslIcons.Atm to AslGradients.Service.MicroAtm.colors
     ReportKind.Pan -> AslIcons.Document to AslGradients.Service.Wallet.colors
     ReportKind.AddMoney -> AslIcons.Plus to AslGradients.success
+    ReportKind.Bbps -> AslIcons.Bill to AslGradients.Service.Bills.colors
 }
 
 @Composable
@@ -415,7 +418,7 @@ fun ReportsTab(onLedger: () -> Unit, onReport: (ReportKind) -> Unit, onFundReque
         }
         SectionHeader(stringResource(R.string.rp_service_reports))
         // Fixed order; a tile shows only if the retailer has that service (all while the list loads or fails).
-        val order = listOf(ReportKind.Recharge, ReportKind.Payout, ReportKind.Aeps, ReportKind.Dmt, ReportKind.AddMoney, ReportKind.Matm, ReportKind.Pan)
+        val order = listOf(ReportKind.Recharge, ReportKind.Bbps, ReportKind.Payout, ReportKind.Aeps, ReportKind.Dmt, ReportKind.AddMoney, ReportKind.Matm, ReportKind.Pan)
         val shown = order.filter { s.loading || s.kinds.isEmpty() || it in s.kinds }
         val items = shown.map { k -> kindIcon(k).let { (i, col) -> ServiceItem(kindName(k), i, col, art = ServiceArt.Picture(kindArt(k))) } }
         ServiceGrid(items, onClick = { item -> onReport(shown[items.indexOf(item)]) })
@@ -557,6 +560,7 @@ fun ReportScreen(shop: ShopInfo, onBack: () -> Unit, vm: ReportViewModel = hiltV
                         ReportKind.Recharge -> R.string.rp_search_hint_recharge; ReportKind.Payout -> R.string.rp_search_hint_payout
                         ReportKind.Aeps, ReportKind.Matm -> R.string.rp_search_hint_aeps; ReportKind.Dmt -> R.string.rp_search_hint_dmt
                         ReportKind.Pan -> R.string.rp_search_hint_pan; ReportKind.AddMoney -> R.string.rp_search_hint_add_money
+                        ReportKind.Bbps -> R.string.rp_search_hint_bbps
                     }), vm::onSearch)
                     if (kind.hasStatusFilter) ChoiceChips(
                         listOf(stringResource(R.string.rp_all), stringResource(R.string.rp_success), stringResource(R.string.rp_pending), stringResource(R.string.rp_failed)),
@@ -607,6 +611,11 @@ private fun summaryTiles(kind: ReportKind, s: Summary?): List<Triple<String, Str
         ReportKind.Dmt -> listOfNotNull(
             t[TotalKind.Success]?.let { Triple(rupees(it), stringResource(R.string.rp_success), AslGradients.success) },
             t[TotalKind.Failed]?.let { Triple(rupees(it), stringResource(R.string.rp_t_failed_refunded), AslGradients.failed) },
+        )
+        ReportKind.Bbps -> listOfNotNull(
+            t[TotalKind.Success]?.let { Triple(rupees(it), stringResource(R.string.rp_success), AslGradients.success) },
+            t[TotalKind.Pending]?.let { Triple(rupees(it), stringResource(R.string.rp_pending), AslGradients.pending) },
+            t[TotalKind.Failed]?.let { Triple(rupees(it), stringResource(R.string.rp_failed), AslGradients.failed) },
         )
         else -> emptyList()
     }

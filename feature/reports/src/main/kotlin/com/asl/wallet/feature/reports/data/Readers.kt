@@ -134,6 +134,22 @@ fun readRow(kind: ReportKind, o: JsonObject): ReportRow? {
             ReportRow(kind, txn, "Wallet top-up · $via", txn, o.amt("amount"), status,
                 Day.parse(o.str("inDate")), cleanTime(o.str("inTime")), f, null, "AM")
         }
+        ReportKind.Bbps -> {
+            // {servid/tranId, trandate, trantime, operatorName, operatorCode, rechargeNo/caNumber, consumerName,
+            //  amount, tranStatus SUCCESS/PENDING/FAILED, operatorRefNo, userOpeningBal/userClosingBal, tranMsg}.
+            val no = o.str("rechargeNo", "caNumber")
+            val op = o.str("operatorName", "consumerName") ?: "Bill payment"
+            val ref = o.str("operatorRefNo")
+            // The retailer needs the full consumer/bill number to match the payment (like the recharge report).
+            f.add(Field.Operator, o.str("operatorName"))
+            f.add(Field.Number, no)
+            f.add(Field.OperatorRef, ref)
+            f.add(Field.TxnId, servid)
+            ReportRow(
+                kind, servid, listOfNotNull(op, no).joinToString(" · "), "Ref ${ref ?: "—"}",
+                o.amt("amount"), Statuses.of(o.str("tranStatus")), day, time, f, complaintOf(o), initials(op),
+            )
+        }
         ReportKind.Dmt -> {
             val name = o.str("beneficiaryName")?.replace(Regex("\\s+"), " ") ?: "Money transfer"
             val bank = o.str("beneficiaryBank")
@@ -205,6 +221,10 @@ fun readSummary(kind: ReportKind?, meta: JsonElement?, totalFromPaging: Int?): S
         ReportKind.AddMoney -> {
             put(TotalKind.Amount, s.amt("totalAmount")); put(TotalKind.Success, s.amt("successAmount")); put(TotalKind.Pending, s.amt("pendingAmount"))
         }
+        ReportKind.Bbps -> {
+            put(TotalKind.Amount, s.amt("totalAmount")); put(TotalKind.Success, s.amt("successAmount"))
+            put(TotalKind.Pending, s.amt("pendingAmount")); put(TotalKind.Failed, s.amt("failureAmount"))
+        }
     }
     return Summary(count, t)
 }
@@ -222,6 +242,7 @@ fun kindsFromServices(rows: List<JsonObject>): Set<ReportKind> {
             "payout" in n || "settlement" in n -> kinds += ReportKind.Payout
             "pan" in n.split(Regex("[^a-z]+")) || "nsdl" in n || "uti" in n.split(Regex("[^a-z]+")) -> kinds += ReportKind.Pan
             "recharge" in n || "prepaid" in n || "dth" in n || "mobile" in n -> kinds += ReportKind.Recharge
+            "bbps" in n || "bill payment" in n || "bill pay" in n || "bills" in n -> kinds += ReportKind.Bbps
         }
     }
     // Send to bank is a wallet feature every retailer has (Module 4), so its report always shows.

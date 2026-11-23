@@ -150,6 +150,7 @@ private class FakeUser : CurrentUser {
     var loggedOut = false
     override val user: StateFlow<UserSummary?> = MutableStateFlow(UserSummary("Ajay Kumar", "ASL Payzones", 6044, "Retailer", false))
     override suspend fun logout() { loggedOut = true }
+    override fun updateAddress(address: String) {}
 }
 
 class ProfileViewModelTest {

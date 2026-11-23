@@ -357,7 +357,7 @@ private fun SheetBody(text: String) = Text(
 // ---------------------------------------------------------------- All services + search
 
 @Composable
-fun AllServicesScreen(vm: HomeViewModel, onBack: () -> Unit) {
+fun AllServicesScreen(vm: HomeViewModel, onBack: () -> Unit, onOpenModule: (Int, String) -> Unit = { _, _ -> }) {
     val state by vm.state.collectAsStateWithLifecycle()
     val c = AslTheme.colors
     // Leaving by any route (toolbar, system Back, gesture) starts the next visit with an empty search.
@@ -385,7 +385,7 @@ fun AllServicesScreen(vm: HomeViewModel, onBack: () -> Unit) {
             }
         }
     }
-    HomeEffects(vm)
+    HomeEffects(vm, onOpenModule)
     ServiceSheetHost(state, vm)
 }
 

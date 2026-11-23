@@ -297,10 +297,17 @@ private fun CustomerCard(s: DmtState, onChange: () -> Unit) {
 }
 
 @Composable
-private fun RecipientRow(r: Recipient, onClick: () -> Unit) = ListRow(
+private fun RecipientRow(r: Recipient, onVerify: (() -> Unit)? = null, onClick: () -> Unit) = ListRow(
     r.name, subtitle = "${r.bankName} · ••${r.last4}", icon = AslIcons.Bank,
     iconColors = if (r.verified) AslGradients.Service.Bills.colors else AslGradients.Service.Neutral.colors, onClick = onClick,
-    trailing = { StatusPill(stringResource(if (r.verified) R.string.d_verified else R.string.d_not_verified), if (r.verified) Status.Success else Status.Neutral) },
+    trailing = {
+        when {
+            r.verified -> StatusPill(stringResource(R.string.d_verified), Status.Success)
+            // Not verified: offer a bank name check right from the list.
+            onVerify != null -> AslButton(stringResource(R.string.d_verify), onVerify, style = AslButtonStyle.Outline, compact = true, icon = AslIcons.Shield)
+            else -> StatusPill(stringResource(R.string.d_not_verified), Status.Neutral)
+        }
+    },
 )
 
 @Composable
@@ -318,8 +325,51 @@ private fun CustomerPage(s: DmtState, vm: DmtViewModel) {
             }
             s.recipients.isEmpty() -> StateView(AslIcons.Bank, AslGradients.Service.Bills.colors, stringResource(R.string.d_no_recipients), stringResource(R.string.d_no_recipients_msg))
             s.visibleRecipients.isEmpty() -> Note(stringResource(R.string.d_no_match))
-            else -> ListCard { s.visibleRecipients.forEachIndexed { i, r -> if (i > 0) Divider(); RecipientRow(r) { vm.pickRecipient(r) } } }
+            else -> ListCard { s.visibleRecipients.forEachIndexed { i, r -> if (i > 0) Divider(); RecipientRow(r, onVerify = { vm.askVerify(r) }) { vm.pickRecipient(r) } } }
         }
+    }
+    VerifyDialog(s, vm)
+}
+
+/** The bank name check for a saved recipient: confirm (paid) → loading → result (match / mismatch) or error. */
+@Composable
+private fun VerifyDialog(s: DmtState, vm: DmtViewModel) {
+    val v = s.verify ?: return
+    val c = AslTheme.colors
+    val r = v.recipient
+    when (v) {
+        is RecipientVerify.Confirm -> AlertDialog(
+            onDismissRequest = vm::cancelVerify, containerColor = c.surface,
+            title = { Text(stringResource(R.string.d_verify_q_title), style = AslTheme.type.title, color = c.textPrimary) },
+            text = { Text(stringResource(R.string.d_verify_q_msg, r.bankName, r.last4, rupees(DmtRules.NAME_CHECK_FEE)), style = AslTheme.type.body, color = c.textSecondary) },
+            confirmButton = { AslButton(stringResource(R.string.d_verify_cta, rupees(DmtRules.NAME_CHECK_FEE)), vm::runVerify, compact = true, icon = AslIcons.Shield) },
+            dismissButton = { AslButton(stringResource(R.string.d_cancel), vm::cancelVerify, style = AslButtonStyle.Outline, compact = true) },
+        )
+        is RecipientVerify.Loading -> AlertDialog(
+            onDismissRequest = {}, containerColor = c.surface,
+            title = { Text(stringResource(R.string.d_verify_checking), style = AslTheme.type.title, color = c.textPrimary) },
+            text = { Text("${r.name} · ••${r.last4}", style = AslTheme.type.body, color = c.textSecondary) },
+            confirmButton = { AslButton(stringResource(R.string.d_verify_checking), {}, compact = true, loading = true) },
+        )
+        is RecipientVerify.Done -> AlertDialog(
+            onDismissRequest = vm::cancelVerify, containerColor = c.surface,
+            title = { Text(stringResource(if (v.matches) R.string.d_verify_ok_title else R.string.d_verify_diff_title), style = AslTheme.type.title, color = if (v.matches) c.success else c.pending) },
+            text = {
+                Text(
+                    if (v.matches) stringResource(R.string.d_verify_ok_msg, v.bankName)
+                    else stringResource(R.string.d_verify_diff_msg, v.bankName, r.name),
+                    style = AslTheme.type.body, color = c.textSecondary,
+                )
+            },
+            confirmButton = { AslButton(stringResource(R.string.d_verify_done), vm::cancelVerify, compact = true) },
+        )
+        is RecipientVerify.Failed -> AlertDialog(
+            onDismissRequest = vm::cancelVerify, containerColor = c.surface,
+            title = { Text(stringResource(R.string.d_verify_fail_title), style = AslTheme.type.title, color = c.textPrimary) },
+            text = { Text(errorText(v.e), style = AslTheme.type.body, color = c.textSecondary) },
+            confirmButton = { AslButton(stringResource(R.string.d_try_again), vm::runVerify, compact = true) },
+            dismissButton = { AslButton(stringResource(R.string.d_cancel), vm::cancelVerify, style = AslButtonStyle.Outline, compact = true) },
+        )
     }
 }
 

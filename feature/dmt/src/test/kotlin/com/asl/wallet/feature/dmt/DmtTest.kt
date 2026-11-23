@@ -37,6 +37,7 @@ import com.asl.wallet.feature.dmt.ui.DmtPage
 import com.asl.wallet.feature.dmt.ui.DmtViewModel
 import com.asl.wallet.feature.dmt.ui.NameCheck
 import com.asl.wallet.feature.dmt.ui.OtpFor
+import com.asl.wallet.feature.dmt.ui.RecipientVerify
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -250,6 +251,7 @@ private class FakeRepo : DmtRepository {
     override suspend fun recipients(mobile: String) = NetworkResult.Success(recipients, null)
     override suspend fun banks() = NetworkResult.Success(listOf(DmtBank("1", "UCO Bank", "UCBA0003284")), null)
     override suspend fun checkName(form: RecipientForm): NetworkResult<String> { nameChecks++; return NetworkResult.Success(name, null) }
+    override suspend fun verifyRecipient(recipient: Recipient): NetworkResult<String> { nameChecks++; return NetworkResult.Success(name, null) }
     override suspend fun addRecipient(customerMobile: String, form: RecipientForm) = addResult
     override suspend fun charges(amount: Int, mode: TransferMode) = NetworkResult.Success(charges, null)
     override suspend fun sendTransferOtp() = NetworkResult.Success(Unit, null)
@@ -260,6 +262,7 @@ private class FakeRepo : DmtRepository {
 private class FakeUser(regno: Long = 6044) : CurrentUser {
     override val user = MutableStateFlow<UserSummary?>(UserSummary("Ajay Kumar", "ASL Payzones", regno, "Retailer", true))
     override suspend fun logout() = Unit
+    override fun updateAddress(address: String) {}
 }
 
 private class FakeRecent : RecentCustomerStore {
@@ -422,6 +425,36 @@ class DmtViewModelTest {
         assertThat(vm.state.value.otpFor).isEqualTo(OtpFor.Recipient)
         vm.onOtp("123456"); vm.submitOtp(); advanceUntilIdle()
         assertThat(vm.state.value.page).isEqualTo(DmtPage.RecipientSaved)
+    }
+
+    @Test fun `verifying a listed recipient checks the name against the bank and matches`() = runTest {
+        val amit = Recipient("1655", "AMIT", "Axis", "9177", "UTIB0000001", "9123456781", false)
+        val repo = FakeRepo().apply { recipients = listOf(amit); name = "AMIT" }
+        val vm = DmtViewModel(repo, FakeRecent(), FakeUser())
+        vm.onMobile("9876543210"); vm.lookup(); advanceUntilIdle()
+        vm.askVerify(amit); assertThat(vm.state.value.verify).isInstanceOf(RecipientVerify.Confirm::class.java)
+        vm.runVerify(); advanceUntilIdle()
+        val done = vm.state.value.verify as RecipientVerify.Done
+        assertThat(done.matches).isTrue()
+        assertThat(repo.nameChecks).isEqualTo(1)
+        vm.cancelVerify(); assertThat(vm.state.value.verify).isNull()
+    }
+
+    @Test fun `verifying warns when the bank name does not match`() = runTest {
+        val amit = Recipient("1655", "AMIT", "Axis", "9177", "UTIB0000001", "9123456781", false)
+        val repo = FakeRepo().apply { recipients = listOf(amit); name = "RAHUL KUMAR" } // bank returns a different name
+        val vm = DmtViewModel(repo, FakeRecent(), FakeUser())
+        vm.onMobile("9876543210"); vm.lookup(); advanceUntilIdle()
+        vm.askVerify(amit); vm.runVerify(); advanceUntilIdle()
+        val done = vm.state.value.verify as RecipientVerify.Done
+        assertThat(done.matches).isFalse()
+        assertThat(done.bankName).isEqualTo("RAHUL KUMAR")
+    }
+
+    @Test fun `an already-verified recipient is never asked to verify`() = runTest {
+        val vm = DmtViewModel(FakeRepo(), FakeRecent(), FakeUser())
+        vm.askVerify(nikhil) // nikhil is verified
+        assertThat(vm.state.value.verify).isNull()
     }
 
     @Test fun `review shows charge and total before the OTP, low balance or over limit never asks for the OTP`() = runTest {

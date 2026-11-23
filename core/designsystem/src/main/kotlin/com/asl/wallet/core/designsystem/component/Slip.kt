@@ -28,7 +28,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.graphics.graphicsLayer
+import com.asl.wallet.core.designsystem.icon.AslIcons
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -192,7 +196,7 @@ fun ReceiptCard(
             Box(Modifier.fillMaxWidth().padding(top = 13.dp).clipToBounds().padding(start = 14.dp, end = 14.dp, bottom = 12.dp)) {
                 Slip(
                     shop, title, amount, amountWords, rows, footer, thanks, barcodeSeed ?: (title + amount),
-                    word, stampColor, stampScale.value, stampAlpha.value, statementHeader, statement,
+                    word, status, stampColor, stampScale.value, stampAlpha.value, statementHeader, statement,
                     (if (captureLayer != null) Modifier.drawWithContent { captureLayer.record { this@drawWithContent.drawContent() }; drawLayer(captureLayer) } else Modifier)
                         .layout { m, c ->
                             val p = m.measure(c)
@@ -250,7 +254,7 @@ private fun PrinterSlot(busy: Boolean) {
 @Composable
 private fun Slip(
     shop: ShopInfo, title: String, amount: String, words: String?, rows: List<KeyValue>, footer: String, thanks: String, seed: String,
-    word: String, stampColor: Color, stampScale: Float, stampAlpha: Float,
+    word: String, status: Status, stampColor: Color, stampScale: Float, stampAlpha: Float,
     statementHeader: List<String>, statement: List<List<String>>, modifier: Modifier,
 ) {
     val shape = remember { TornEdgeShape(14f) }
@@ -278,11 +282,14 @@ private fun Slip(
                     Modifier.size(48.dp),
                     contentScale = ContentScale.Fit,
                 )
-                Text(listOf(shop.name, shop.id).filter { it.isNotBlank() }.joinToString(" · "), color = Paper.ink, fontSize = 13.5.sp, fontWeight = FontWeight.ExtraBold,
+                // Shop name only — the reg-no / user id is no longer printed at the top (user, 23 Nov 2026).
+                Text(shop.name, color = Paper.ink, fontSize = 13.5.sp, fontWeight = FontWeight.ExtraBold,
                     textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
                 if (shop.addressLine.isNotBlank()) Text(shop.addressLine, color = Paper.soft, fontSize = 10.5.sp, textAlign = TextAlign.Center)
             }
             TearLine()
+            // Standard status band: a clear colour + icon + word, so the retailer reads it at a glance.
+            if (word.isNotBlank()) StatusBand(word, status, stampColor, stampAlpha)
             // service and amount
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(title.uppercase(), color = Paper.soft, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.5.sp, textAlign = TextAlign.Center)
@@ -327,16 +334,64 @@ private fun Slip(
                     }
                 }
             }
+            // Retailer details: on every report receipt so the customer always has the shop's name, phone and address.
+            if (shop.ownerName.isNotBlank() || shop.phone.isNotBlank() || shop.addressLine.isNotBlank()) {
+                TearLine()
+                RetailerDetails(shop)
+            }
             Barcode(seed, Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 6.dp).padding(horizontal = 6.dp).height(32.dp))
             Text(footer, color = Paper.soft, fontSize = 10.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
             Text(thanks, color = Paper.ink, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
         }
-        // the inked status stamp, top-right corner
-        if (word.isNotBlank()) Text(
-            word.uppercase(), color = stampColor, fontSize = 12.sp, fontWeight = FontWeight.Black, letterSpacing = 1.5.sp,
-            modifier = Modifier.align(Alignment.TopEnd).offset(x = (-10).dp, y = 22.dp).alpha(stampAlpha).scale(stampScale).rotate(-12f)
-                .border(2.dp, stampColor.copy(alpha = 0.85f), RoundedCornerShape(7.dp)).padding(horizontal = 8.dp, vertical = 2.dp),
-        )
+    }
+}
+
+/** The coloured status row (success / pending / failed) at the top of the slip. [alpha] animates it in after printing. */
+@Composable
+private fun StatusBand(word: String, status: Status, color: Color, alpha: Float) {
+    val icon = when (status) {
+        Status.Success -> AslIcons.Check
+        Status.Pending -> AslIcons.Clock
+        Status.Failed -> AslIcons.Close
+        else -> AslIcons.Alert
+    }
+    val sub = when (status) {
+        Status.Success -> "Transaction completed"
+        Status.Pending -> "Awaiting confirmation"
+        Status.Failed -> "Not successful · amount refunded if debited"
+        else -> null
+    }
+    Row(
+        Modifier.fillMaxWidth().graphicsLayer { this.alpha = alpha }
+            .clip(RoundedCornerShape(10.dp)).background(color.copy(alpha = 0.12f)).padding(horizontal = 12.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(Modifier.size(26.dp).clip(CircleShape).background(color.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
+            Icon(icon, null, tint = color, modifier = Modifier.size(17.dp))
+        }
+        Column {
+            Text(word.uppercase(), color = color, fontSize = 13.5.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
+            if (sub != null) Text(sub, color = color.copy(alpha = 0.85f), fontSize = 10.sp, lineHeight = 13.sp)
+        }
+    }
+}
+
+/** The "Retailer details" block at the foot of the slip: shop name, phone and address. */
+@Composable
+private fun RetailerDetails(shop: ShopInfo) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("RETAILER DETAILS", color = Paper.soft, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.4.sp)
+        @Composable
+        fun line(label: String, value: String) {
+            if (value.isBlank()) return
+            Row(Modifier.fillMaxWidth().padding(top = 2.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(label, color = Paper.soft, fontSize = 11.sp, modifier = Modifier.width(54.dp))
+                Text(value, color = Paper.ink, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            }
+        }
+        line("Name", shop.ownerName.ifBlank { shop.name })
+        line("Phone", shop.phone)
+        line("Address", shop.addressLine)
     }
 }
 

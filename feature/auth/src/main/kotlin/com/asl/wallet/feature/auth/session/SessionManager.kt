@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -45,9 +46,14 @@ class SessionManager @Inject constructor(
     private val _state = MutableStateFlow<SessionState>(SessionState.Unknown)
     val state: StateFlow<SessionState> = _state.asStateFlow()
 
-    override val user: StateFlow<UserSummary?> = _state
-        .map { (it as? SessionState.SignedIn)?.user?.let { u -> UserSummary(u.name, u.shopName, u.regno, u.userType, u.kycDone) } }
-        .stateIn(scope, SharingStarted.Eagerly, null)
+    /** The retailer's address, filled in after the profile loads (receipts show it). */
+    private val _address = MutableStateFlow("")
+
+    override val user: StateFlow<UserSummary?> = combine(_state, _address) { s, address ->
+        (s as? SessionState.SignedIn)?.user?.let { u -> UserSummary(u.name, u.shopName, u.regno, u.userType, u.kycDone, phone = u.phone, address = address) }
+    }.stateIn(scope, SharingStarted.Eagerly, null)
+
+    override fun updateAddress(address: String) { _address.value = address.trim() }
 
     init {
         scope.launch { sessionEvents.signOut.collect { reason -> endSession(reason) } }
@@ -96,6 +102,7 @@ class SessionManager @Inject constructor(
         repository.clearPending()
         cleanups.forEach { runCatching { it.clear() } }
         appLock.isSessionActive = false
+        _address.value = ""
         _state.value = SessionState.SignedOut(reason)
     }
 }

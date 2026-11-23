@@ -291,6 +291,7 @@ private class FakeUser(u: UserSummary?) : CurrentUser {
     var loggedOut = false
     override val user: StateFlow<UserSummary?> = flow
     override suspend fun logout() { loggedOut = true; flow.value = null }
+    override fun updateAddress(address: String) {}
 }
 
 private class FakeHomeRepo : HomeRepository {

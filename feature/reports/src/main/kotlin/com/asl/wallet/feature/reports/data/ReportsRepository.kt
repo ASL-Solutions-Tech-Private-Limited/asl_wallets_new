@@ -22,6 +22,9 @@ import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import com.asl.wallet.core.common.session.SignOutCleanup
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import retrofit2.Response
 import retrofit2.Retrofit
 import javax.inject.Inject
@@ -82,23 +85,60 @@ class ReportsRepositoryImpl @Inject constructor(
     }
 
     override suspend fun report(kind: ReportKind, q: ReportQuery): NetworkResult<ReportPage<ReportRow>> {
-        val params = mutableMapOf(
-            "fromDate" to q.period.from.iso(), "toDate" to q.period.to.iso(),
-            "page" to q.page.toString(), "limit" to ReportRules.PAGE.toString(),
-        )
-        if (kind == ReportKind.Dmt) {
-            // Admin report filtered by reg no (user's choice, 6 Nov 2026): only ever the signed-in retailer's own.
-            val regno = currentUser.get().user.value?.regno ?: return NetworkResult.Failure.Unauthorized
-            params["regNo"] = regno.toString()
-        }
         val status = q.status?.let(kind::statusValue)
-        if (status != null && kind.statusParam != null) params[kind.statusParam] = status
-        ReportRules.cleanSearch(q.search).trim().takeIf { it.length >= ReportRules.MIN_SEARCH }?.let { params[kind.searchParam(it)] = it }
-        val (r, env) = withEnvelope { api.report(kind.path, params) }
+        val search = ReportRules.cleanSearch(q.search).trim().takeIf { it.length >= ReportRules.MIN_SEARCH }
+        val searchField = search?.let(kind::searchParam)
+
+        val (r, env) = if (kind.usesPost) {
+            withEnvelope { api.reportPost(kind.path, bbpsBody(kind, q, status, searchField, search)) }
+        } else {
+            val params = mutableMapOf(
+                "fromDate" to q.period.from.iso(), "toDate" to q.period.to.iso(),
+                "page" to q.page.toString(), "limit" to ReportRules.PAGE.toString(),
+            )
+            if (kind == ReportKind.Dmt) {
+                // Admin report filtered by reg no (user's choice, 6 Nov 2026): only ever the signed-in retailer's own.
+                val regno = currentUser.get().user.value?.regno ?: return NetworkResult.Failure.Unauthorized
+                params["regNo"] = regno.toString()
+            }
+            if (status != null && kind.statusParam != null) params[kind.statusParam] = status
+            if (searchField != null && search != null) params[searchField] = search
+            withEnvelope { api.report(kind.path, params) }
+        }
         return r.map { rows ->
-            ReportPage(rows.mapNotNull { readRow(kind, it) }, readSummary(kind, env?.meta, env?.pagination?.totalOrNull), canLoadMore(env, rows.size, ReportRules.PAGE))
+            // BBPS nests pagination under meta; GET reports send it at the top level.
+            val pg = env?.pagination ?: metaPagination(env?.meta)
+            ReportPage(
+                rows.mapNotNull { readRow(kind, it) },
+                readSummary(kind, env?.meta, pg?.totalOrNull),
+                pg?.canLoadMore ?: (rows.size >= ReportRules.PAGE),
+            )
         }
     }
+
+    /** The full BBPS filter body; unused filters are sent empty, exactly as the API expects. */
+    private fun bbpsBody(kind: ReportKind, q: ReportQuery, status: String?, searchField: String?, search: String?): JsonObject = buildJsonObject {
+        put("page", q.page)
+        put("limit", ReportRules.PAGE)
+        put("sort", "desc")
+        put("tranId", if (searchField == "tranId") search.orEmpty() else "")
+        put("rechargeNo", if (searchField == "rechargeNo") search.orEmpty() else "")
+        put("operatorName", "")
+        put("operatorCode", "")
+        put("operatorRefNo", "")
+        // Status filter: a specific status, or ALL when the user hasn't picked one.
+        put("tranStatus", status?.takeIf { kind.statusParam != null } ?: "ALL")
+        put("amount", "")
+        put("fromDate", q.period.from.iso())
+        put("toDate", q.period.to.iso())
+        // Retailer's own transactions only.
+        put("scope", "self")
+    }
+
+    private fun metaPagination(meta: kotlinx.serialization.json.JsonElement?): com.asl.wallet.core.network.model.Pagination? =
+        ((meta as? JsonObject)?.get("pagination"))?.let {
+            runCatching { json.decodeFromJsonElement(com.asl.wallet.core.network.model.Pagination.serializer(), it) }.getOrNull()
+        }
 
     override suspend fun complain(row: ReportRow, text: String): NetworkResult<Unit> {
         val path = row.kind.complainPath ?: return NetworkResult.Failure.Unexpected("No complaints for this report")

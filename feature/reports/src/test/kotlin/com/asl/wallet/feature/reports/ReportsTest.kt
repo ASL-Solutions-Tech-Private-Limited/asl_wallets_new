@@ -182,6 +182,29 @@ class ReadersTest {
         assertThat(withCustomer.fields).contains(Field.Customer to "Avijit · 89XXX XX651")
     }
 
+    @Test fun `BBPS row - consumer number shown, status and amount read, provider message not shown`() {
+        val row = """{"servid":"OINBEPVNFA6J25XA145NM05IV3LV7KE3OMV","tranId":"OINBEPVNFA6J25XA145NM05IV3LV7KE3OMV","trandate":"19-11-2026",
+            "trantime":"12:51:23 PM","operatorName":"","operatorCode":"MSE000000MAH01","rechargeNo":"123456789012","caNumber":"123456789012",
+            "amount":500,"tranStatus":"SUCCESS","operatorRefNo":"123456789012","tranMsg":"Bill Payment of Electricity 123456789012 - Successful"}"""
+        val r = readRow(ReportKind.Bbps, obj(row))!!
+        assertThat(r.status).isEqualTo(RowStatus.Success)
+        assertThat(r.amount).isEqualTo(BigDecimal(500))
+        assertThat(r.day).isEqualTo(Day(2026, 11, 19))
+        assertThat(r.fields).contains(Field.Number to "123456789012")
+        assertThat(r.fields).contains(Field.TxnId to "OINBEPVNFA6J25XA145NM05IV3LV7KE3OMV")
+        assertThat(r.toString()).doesNotContain("Bill Payment of Electricity") // provider tranMsg never shown
+    }
+
+    @Test fun `BBPS summary reads counts and amounts from meta summary`() {
+        val meta = json.parseToJsonElement("""{"summary":{"totalCount":7,"totalAmount":19620,"successAmount":5530,"pendingAmount":5030,"failureAmount":9060}}""")
+        val s = readSummary(ReportKind.Bbps, meta, null)!!
+        val totals = s.totals.toMap()
+        assertThat(s.count).isEqualTo(7)
+        assertThat(totals[com.asl.wallet.feature.reports.domain.TotalKind.Amount]).isEqualTo(BigDecimal(19620))
+        assertThat(totals[com.asl.wallet.feature.reports.domain.TotalKind.Success]).isEqualTo(BigDecimal(5530))
+        assertThat(totals[com.asl.wallet.feature.reports.domain.TotalKind.Failed]).isEqualTo(BigDecimal(9060))
+    }
+
     @Test fun `payout row - account last 4, bank reason only when failed and safe`() {
         val row = """{"servid":"CME1","reqBene":"SUSANTA PATRA","bankName":"STATE BANK OF INDIA","accountNumber":"40447541331","tranMode":"IMPS","amount":10000,
             "tranCharges":5,"tranStatus":"SUCCESS","bankRrn":"519263502791","tranRemarks":"Transaction Successful","trandate":"2025-07-11","trantime":"07:44:05 PM"}"""
@@ -246,6 +269,7 @@ class ReadersTest {
 private class FakeUser(regno: Long? = 6044) : CurrentUser {
     override val user = MutableStateFlow(regno?.let { UserSummary("Ajay Kumar", "ASL Payzones", it, "Retailer", true) })
     override suspend fun logout() = Unit
+    override fun updateAddress(address: String) {}
 }
 
 class ReportsRepositoryTest {

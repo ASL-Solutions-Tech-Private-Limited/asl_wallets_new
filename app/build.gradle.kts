@@ -90,7 +90,9 @@ android {
             buildConfigField("boolean", "ALLOW_EMULATOR", "false")
             buildConfigField("boolean", "ALLOW_INTEGRITY_BYPASS", "false")
             buildConfigField("boolean", "APP_LOCK_ENABLED", "$liveAppLock")
-            buildConfigField("boolean", "PAYU_ENABLED", "false")
+            // Add Money via PayU is on in Live (user, 23 Nov 2026). With PAYU_PRODUCTION = true this is PayU LIVE:
+            // a completed top-up moves real money. Needs the PayU create-order/callback routes live on payzones.net.
+            buildConfigField("boolean", "PAYU_ENABLED", "true")
             buildConfigField("boolean", "PAYU_PRODUCTION", "true")
         }
     }

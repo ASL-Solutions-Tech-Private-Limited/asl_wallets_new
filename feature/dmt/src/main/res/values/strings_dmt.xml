@@ -42,6 +42,17 @@
     <string name="d_add_recipient">Add recipient</string>
     <string name="d_verified">Verified</string>
     <string name="d_not_verified">Not verified</string>
+    <string name="d_verify">Verify</string>
+    <string name="d_verify_q_title">Verify this account?</string>
+    <string name="d_verify_q_msg">We\'ll check the name on the %1$s account ending ••%2$s with the bank. A %3$s name-check fee applies.</string>
+    <string name="d_verify_cta">Verify · %1$s</string>
+    <string name="d_verify_checking">Checking with the bank…</string>
+    <string name="d_verify_ok_title">Account verified</string>
+    <string name="d_verify_ok_msg">The bank has this account as %1$s, which matches this recipient.</string>
+    <string name="d_verify_diff_title">Name doesn\'t match</string>
+    <string name="d_verify_diff_msg">The bank has this account as %1$s, not %2$s. Please check before you send money.</string>
+    <string name="d_verify_fail_title">Couldn\'t verify</string>
+    <string name="d_verify_done">Done</string>
     <string name="d_bank">Bank</string>
     <string name="d_choose_bank">Choose bank</string>
     <string name="d_bank_needed">Choose a bank</string>

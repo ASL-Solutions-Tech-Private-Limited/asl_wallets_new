@@ -61,6 +61,16 @@ sealed interface NameCheck {
     data class Error(val e: UiError) : NameCheck
 }
 
+/** Verifying an already-saved recipient from the beneficiary list (the paid bank name check). */
+sealed interface RecipientVerify {
+    val recipient: Recipient
+    data class Confirm(override val recipient: Recipient) : RecipientVerify
+    data class Loading(override val recipient: Recipient) : RecipientVerify
+    /** [matches] = the bank's [bankName] matches the saved recipient name. */
+    data class Done(override val recipient: Recipient, val bankName: String, val matches: Boolean) : RecipientVerify
+    data class Failed(override val recipient: Recipient, val e: UiError) : RecipientVerify
+}
+
 data class DmtState(
     val page: DmtPage = DmtPage.Mobile,
     /** What's typed on 5B.1: a mobile number or part of a name. */
@@ -79,6 +89,8 @@ data class DmtState(
     val recipientsLoading: Boolean = false,
     val recipientsError: UiError? = null,
     val query: String = "",
+    /** Non-null while verifying one of the listed recipients. */
+    val verify: RecipientVerify? = null,
     // add recipient
     val form: RecipientForm = RecipientForm(),
     val banks: List<DmtBank> = emptyList(),
@@ -266,6 +278,34 @@ class DmtViewModel @Inject constructor(
                     }
                 }
                 is NetworkResult.Failure -> _state.update { it.copy(nameCheck = NameCheck.Error(r.toUiError())) }
+            }
+        }
+    }
+
+    // ------------------------------------------------------------ verify a saved recipient (bank name check)
+
+    /** From the beneficiary list: a not-yet-verified recipient can be checked against the bank. */
+    fun askVerify(r: Recipient) { if (!r.verified) _state.update { it.copy(verify = RecipientVerify.Confirm(r)) } }
+
+    fun cancelVerify() = _state.update { it.copy(verify = null) }
+
+    fun runVerify() {
+        // Runnable from the confirm step or a retry after a failure.
+        val r = when (val v = _state.value.verify) {
+            is RecipientVerify.Confirm -> v.recipient
+            is RecipientVerify.Failed -> v.recipient
+            else -> return
+        }
+        _state.update { it.copy(verify = RecipientVerify.Loading(r)) }
+        viewModelScope.launch {
+            when (val res = repo.verifyRecipient(r)) {
+                is NetworkResult.Success -> {
+                    val matches = !DmtRules.namesDiffer(r.name, res.data)
+                    _state.update { it.copy(verify = RecipientVerify.Done(r, res.data, matches)) }
+                    // Pull the list again so the server's verified flag (if it flipped) shows in the row.
+                    if (matches) loadRecipients()
+                }
+                is NetworkResult.Failure -> _state.update { it.copy(verify = RecipientVerify.Failed(r, res.toUiError())) }
             }
         }
     }

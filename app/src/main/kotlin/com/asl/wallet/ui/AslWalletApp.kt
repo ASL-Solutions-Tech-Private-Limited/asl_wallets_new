@@ -302,7 +302,23 @@ private fun AppNavHost(nav: NavHostController, vm: AppViewModel, ui: AppUiState,
                     onDismiss = { aepsChooser = false },
                 )
             }
-            composable(Routes.ALL_SERVICES) { entry -> AllServicesScreen(mainViewModel(nav, entry), onBack = { nav.popBackStack() }) }
+            composable(Routes.ALL_SERVICES) { entry ->
+                // All Services opens an active service's module, just like Home (previously it did nothing here).
+                var aepsChooser by rememberSaveable { mutableStateOf(false) }
+                AllServicesScreen(mainViewModel(nav, entry), onBack = { nav.popBackStack() }, onOpenModule = { module, key ->
+                    when (module) {
+                        ServiceCatalogue.AEPS_MODULE -> aepsChooser = true
+                        ServiceCatalogue.RECHARGE_MODULE -> nav.navigate(RechargeRoutes.recharge(if ("dth" in key) RechargeType.Dth else RechargeType.Mobile))
+                        ServiceCatalogue.DMT_MODULE -> nav.navigate(DmtRoutes.DMT)
+                        ServiceCatalogue.PAYOUT_MODULE -> { nav.navigate(WalletRoutes.GRAPH); nav.navigate(WalletRoutes.SEND) }
+                        ServiceCatalogue.BBPS_MODULE -> nav.navigate(BbpsRoutes.bbps(BbpsRoutes.categoryForService(key)))
+                    }
+                })
+                if (aepsChooser) AepsBankChooserSheet(
+                    onChosen = { p -> aepsChooser = false; nav.navigate(AepsRoutes.gate(p)) },
+                    onDismiss = { aepsChooser = false },
+                )
+            }
             composable(Routes.EDIT_SERVICES) { entry -> EditServicesScreen(mainViewModel(nav, entry), onDone = { nav.popBackStack() }) }
             composable(Routes.ARRANGE_HOME) { entry -> ArrangeHomeScreen(mainViewModel(nav, entry), onDone = { nav.popBackStack() }) }
             composable(Routes.NOTIFICATIONS) { NotificationsScreen(onBack = { nav.popBackStack() }) }
@@ -358,7 +374,7 @@ private fun AppNavHost(nav: NavHostController, vm: AppViewModel, ui: AppUiState,
             nav,
             shop = {
                 val u by vm.currentUser.user.collectAsStateWithLifecycle()
-                ShopInfo(u?.shopName?.ifBlank { null } ?: u?.name.orEmpty(), u?.regno?.let { "R-$it" }.orEmpty(), "")
+                ShopInfo(u?.shopName?.ifBlank { null } ?: u?.name.orEmpty(), u?.regno?.let { "R-$it" }.orEmpty(), u?.address.orEmpty(), phone = u?.phone.orEmpty(), ownerName = u?.name.orEmpty())
             },
             onHome = { nav.navigate(Routes.MAIN) { popUpTo(Routes.MAIN) { inclusive = false }; launchSingleTop = true } },
             onCallSupport = { openDialer(context, vm.support.phone) },
@@ -369,7 +385,7 @@ private fun AppNavHost(nav: NavHostController, vm: AppViewModel, ui: AppUiState,
             nav,
             shop = {
                 val u by vm.currentUser.user.collectAsStateWithLifecycle()
-                ShopInfo(u?.shopName?.ifBlank { null } ?: u?.name.orEmpty(), u?.regno?.let { "R-$it" }.orEmpty(), "")
+                ShopInfo(u?.shopName?.ifBlank { null } ?: u?.name.orEmpty(), u?.regno?.let { "R-$it" }.orEmpty(), u?.address.orEmpty(), phone = u?.phone.orEmpty(), ownerName = u?.name.orEmpty())
             },
             onExit = { nav.navigate(Routes.MAIN) { popUpTo(Routes.MAIN) { inclusive = false }; launchSingleTop = true } },
             onCallSupport = { openDialer(context, vm.support.phone) },
@@ -379,7 +395,7 @@ private fun AppNavHost(nav: NavHostController, vm: AppViewModel, ui: AppUiState,
         bbpsGraph(
             shop = {
                 val u by vm.currentUser.user.collectAsStateWithLifecycle()
-                ShopInfo(u?.shopName?.ifBlank { null } ?: u?.name.orEmpty(), u?.regno?.let { "R-$it" }.orEmpty(), "")
+                ShopInfo(u?.shopName?.ifBlank { null } ?: u?.name.orEmpty(), u?.regno?.let { "R-$it" }.orEmpty(), u?.address.orEmpty(), phone = u?.phone.orEmpty(), ownerName = u?.name.orEmpty())
             },
             onBack = { nav.popBackStack() },
             onAddMoney = { nav.navigate(WalletRoutes.GRAPH); nav.navigate(WalletRoutes.ADD_MONEY) },
@@ -390,7 +406,7 @@ private fun AppNavHost(nav: NavHostController, vm: AppViewModel, ui: AppUiState,
         rechargeGraph(
             shop = {
                 val u by vm.currentUser.user.collectAsStateWithLifecycle()
-                ShopInfo(u?.shopName?.ifBlank { null } ?: u?.name.orEmpty(), u?.regno?.let { "R-$it" }.orEmpty(), "")
+                ShopInfo(u?.shopName?.ifBlank { null } ?: u?.name.orEmpty(), u?.regno?.let { "R-$it" }.orEmpty(), u?.address.orEmpty(), phone = u?.phone.orEmpty(), ownerName = u?.name.orEmpty())
             },
             onBack = { nav.popBackStack() },
             onAddMoney = { nav.navigate(WalletRoutes.GRAPH); nav.navigate(WalletRoutes.ADD_MONEY) },
@@ -402,7 +418,7 @@ private fun AppNavHost(nav: NavHostController, vm: AppViewModel, ui: AppUiState,
         dmtGraph(
             shop = {
                 val u by vm.currentUser.user.collectAsStateWithLifecycle()
-                ShopInfo(u?.shopName?.ifBlank { null } ?: u?.name.orEmpty(), u?.regno?.let { "R-$it" }.orEmpty(), "")
+                ShopInfo(u?.shopName?.ifBlank { null } ?: u?.name.orEmpty(), u?.regno?.let { "R-$it" }.orEmpty(), u?.address.orEmpty(), phone = u?.phone.orEmpty(), ownerName = u?.name.orEmpty())
             },
             onBack = { nav.popBackStack() },
             onAddMoney = { nav.navigate(WalletRoutes.GRAPH); nav.navigate(WalletRoutes.ADD_MONEY) },
@@ -414,7 +430,7 @@ private fun AppNavHost(nav: NavHostController, vm: AppViewModel, ui: AppUiState,
         reportsGraph(
             shop = {
                 val u by vm.currentUser.user.collectAsStateWithLifecycle()
-                ShopInfo(u?.shopName?.ifBlank { null } ?: u?.name.orEmpty(), u?.regno?.let { "R-$it" }.orEmpty(), "")
+                ShopInfo(u?.shopName?.ifBlank { null } ?: u?.name.orEmpty(), u?.regno?.let { "R-$it" }.orEmpty(), u?.address.orEmpty(), phone = u?.phone.orEmpty(), ownerName = u?.name.orEmpty())
             },
             onBack = { nav.popBackStack() },
         )

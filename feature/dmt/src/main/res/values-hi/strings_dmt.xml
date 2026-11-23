@@ -42,6 +42,17 @@
     <string name="d_add_recipient">पाने वाला जोड़ें</string>
     <string name="d_verified">वेरिफ़ाइड</string>
     <string name="d_not_verified">वेरिफ़ाइड नहीं</string>
+    <string name="d_verify">वेरिफ़ाई करें</string>
+    <string name="d_verify_q_title">यह खाता वेरिफ़ाई करें?</string>
+    <string name="d_verify_q_msg">हम %1$s खाते (••%2$s पर खत्म) का नाम बैंक से जाँचेंगे। %3$s नेम-चेक शुल्क लगेगा।</string>
+    <string name="d_verify_cta">वेरिफ़ाई करें · %1$s</string>
+    <string name="d_verify_checking">बैंक से जाँच हो रही है…</string>
+    <string name="d_verify_ok_title">खाता वेरिफ़ाई हुआ</string>
+    <string name="d_verify_ok_msg">बैंक में यह खाता %1$s के नाम है, जो इस प्राप्तकर्ता से मेल खाता है।</string>
+    <string name="d_verify_diff_title">नाम मेल नहीं खाता</string>
+    <string name="d_verify_diff_msg">बैंक में यह खाता %1$s के नाम है, %2$s के नहीं। पैसे भेजने से पहले जाँच लें।</string>
+    <string name="d_verify_fail_title">वेरिफ़ाई नहीं हो सका</string>
+    <string name="d_verify_done">हो गया</string>
     <string name="d_bank">बैंक</string>
     <string name="d_choose_bank">बैंक चुनें</string>
     <string name="d_bank_needed">बैंक चुनें</string>

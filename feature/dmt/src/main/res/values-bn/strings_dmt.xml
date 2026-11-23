@@ -42,6 +42,17 @@
     <string name="d_add_recipient">প্রাপক যোগ করুন</string>
     <string name="d_verified">যাচাই করা</string>
     <string name="d_not_verified">যাচাই হয়নি</string>
+    <string name="d_verify">যাচাই করুন</string>
+    <string name="d_verify_q_title">এই অ্যাকাউন্ট যাচাই করবেন?</string>
+    <string name="d_verify_q_msg">আমরা %1$s অ্যাকাউন্টের (••%2$s এ শেষ) নাম ব্যাঙ্কে যাচাই করব। %3$s নেম-চেক ফি প্রযোজ্য।</string>
+    <string name="d_verify_cta">যাচাই করুন · %1$s</string>
+    <string name="d_verify_checking">ব্যাঙ্কে যাচাই হচ্ছে…</string>
+    <string name="d_verify_ok_title">অ্যাকাউন্ট যাচাই হয়েছে</string>
+    <string name="d_verify_ok_msg">ব্যাঙ্কে এই অ্যাকাউন্ট %1$s নামে আছে, যা এই প্রাপকের সাথে মেলে।</string>
+    <string name="d_verify_diff_title">নাম মেলে না</string>
+    <string name="d_verify_diff_msg">ব্যাঙ্কে এই অ্যাকাউন্ট %1$s নামে আছে, %2$s নয়। টাকা পাঠানোর আগে দেখে নিন।</string>
+    <string name="d_verify_fail_title">যাচাই করা যায়নি</string>
+    <string name="d_verify_done">সম্পন্ন</string>
     <string name="d_bank">ব্যাংক</string>
     <string name="d_choose_bank">ব্যাংক বেছে নিন</string>
     <string name="d_bank_needed">একটি ব্যাংক বেছে নিন</string>

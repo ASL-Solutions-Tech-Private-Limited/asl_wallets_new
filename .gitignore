@@ -14,5 +14,9 @@ secrets.properties
 dist/
 .kotlin/
 
+# Signed release artifacts exported outside build/ (APK/AAB) — do not commit
+/app/live/
+/app/*/release/
+
 # Firebase config (contains API key) — place locally / provide in CI, do not commit
 **/google-services.json

@@ -30,7 +30,18 @@ import com.asl.wallet.core.designsystem.theme.AslGradients
 import com.asl.wallet.core.designsystem.theme.AslShapes
 import com.asl.wallet.core.designsystem.theme.AslTheme
 
-data class ShopInfo(val name: String, val id: String, val addressLine: String)
+/**
+ * Who the receipt is from. [name] is the shop name shown at the top (the reg-no [id] is kept for callers but no
+ * longer printed in the header). [ownerName], [phone] and [addressLine] fill the "Retailer details" block at the
+ * foot of every receipt.
+ */
+data class ShopInfo(
+    val name: String,
+    val id: String,
+    val addressLine: String,
+    val phone: String = "",
+    val ownerName: String = "",
+)
 
 /** The customer receipt itself is the paper slip in Slip.kt ([ReceiptCard]). */
 

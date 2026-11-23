@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -40,6 +42,8 @@ class AppViewModel @Inject constructor(
     val support: SupportContacts,
     /** Signed-in retailer (name, shop, reg no) for receipt headers. */
     val currentUser: CurrentUser,
+    /** Loaded once after sign-in so receipts can show the retailer's address. */
+    private val profileRepository: com.asl.wallet.feature.profile.data.ProfileRepository,
     /** UAT-only demos (empty in release and Live builds). */
     val demoToggles: Set<@JvmSuppressWildcards com.asl.wallet.core.common.demo.DemoToggle>,
 ) : ViewModel() {
@@ -56,6 +60,22 @@ class AppViewModel @Inject constructor(
         // debug build (so Live can be tested on an emulator); release builds still block emulators.
         val allowEmulator = BuildConfig.ALLOW_EMULATOR || BuildConfig.DEBUG
         _ui.update { it.copy(integrityIssues = report.issues, integrityBlocked = report.blocksPayments(allowEmulator)) }
+
+        // On each new sign-in, load the profile once and fill in the retailer's address for receipts.
+        viewModelScope.launch {
+            currentUser.user
+                .map { it?.regno?.takeIf { r -> r != 0L } }
+                .distinctUntilChanged()
+                .collect { regno ->
+                    if (regno == null) return@collect
+                    val r = profileRepository.profile()
+                    if (r is com.asl.wallet.core.network.NetworkResult.Success) {
+                        val d = r.data
+                        val addr = listOf(d.address, d.city, d.pincode).map { it.trim() }.filter { it.isNotEmpty() }.joinToString(", ")
+                        if (addr.isNotEmpty()) currentUser.updateAddress(addr)
+                    }
+                }
+        }
     }
 
     fun setTheme(mode: ThemeMode) = viewModelScope.launch { prefs.setThemeMode(mode) }

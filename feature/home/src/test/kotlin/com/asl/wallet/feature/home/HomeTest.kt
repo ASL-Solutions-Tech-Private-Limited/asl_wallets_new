@@ -111,7 +111,7 @@ class ServiceCatalogueTest {
         assertThat(two.map { it.name }).containsExactly("AEPS", "DMT").inOrder()
         assertThat(two.first().key).isEqualTo(ServiceCatalogue.AEPS_KEY)
         assertThat(list[0].destination).isEqualTo(ServiceDestination.App(ServiceCatalogue.AEPS_MODULE))
-        assertThat(list[1].destination).isEqualTo(ServiceDestination.ComingSoon)
+        assertThat(list[1].destination).isEqualTo(ServiceDestination.App(ServiceCatalogue.MATM_MODULE))
         assertThat(ServiceCatalogue.fallback().first { it.kind == ServiceKind.Aeps }.destination).isEqualTo(ServiceDestination.App(3))
     }
 
@@ -300,7 +300,7 @@ private class FakeHomeRepo : HomeRepository {
     var recentResult: NetworkResult<List<LedgerEntry>> = NetworkResult.Success(emptyList(), null)
     var servicesResult = ServicesResult(
         ServiceCatalogue.fromServer(
-            listOf(dto("AEPS", 1), dto("Micro ATM", 2), dto("Mobile recharge", 3), dto("IRCTC", 4, link = "https://www.irctc.co.in"), dto("FASTag", 5)),
+            listOf(dto("AEPS", 1), dto("Micro ATM", 2), dto("Mobile recharge", 3), dto("IRCTC", 4, link = "https://www.irctc.co.in"), dto("FASTag", 5), dto("LIC premium", 6)),
         ),
         fromServer = true,
     )
@@ -400,7 +400,7 @@ class HomeViewModelTest {
         assertThat(vm.state.value.offline).isFalse()
     }
 
-    @Test fun `no KYC locks - AEPS, Recharge and BBPS open their modules, unbuilt services say coming soon`() = runTest {
+    @Test fun `no KYC locks - AEPS, Recharge, BBPS and Micro ATM open their modules, unbuilt services say coming soon`() = runTest {
         val (_, vm) = vm(retailer.copy(kycDone = false))
         runCurrent()
         val s = vm.state.value
@@ -408,6 +408,7 @@ class HomeViewModelTest {
         val mobile = s.services.first { it.name == "Mobile recharge" }
         val fastag = s.services.first { it.name == "FASTag" }
         val matm = s.services.first { it.name == "Micro ATM" }
+        val lic = s.services.first { it.name == "LIC premium" }
         vm.events.test {
             vm.onServiceClick(aeps)
             assertThat(awaitItem()).isEqualTo(HomeEvent.OpenModule(3, aeps.key))
@@ -415,10 +416,12 @@ class HomeViewModelTest {
             assertThat(awaitItem()).isEqualTo(HomeEvent.OpenModule(ServiceCatalogue.RECHARGE_MODULE, mobile.key))
             vm.onServiceClick(fastag)
             assertThat(awaitItem()).isEqualTo(HomeEvent.OpenModule(ServiceCatalogue.BBPS_MODULE, fastag.key))
+            vm.onServiceClick(matm)
+            assertThat(awaitItem()).isEqualTo(HomeEvent.OpenModule(ServiceCatalogue.MATM_MODULE, matm.key))
         }
         assertThat(vm.state.value.sheet).isNull()
-        vm.onServiceClick(matm)
-        assertThat(vm.state.value.sheet).isEqualTo(ServiceSheet.ComingSoon(matm))
+        vm.onServiceClick(lic)
+        assertThat(vm.state.value.sheet).isEqualTo(ServiceSheet.ComingSoon(lic))
     }
 
     @Test fun `partner site opens only after confirming, with the https URL`() = runTest {

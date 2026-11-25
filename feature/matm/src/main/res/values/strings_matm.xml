@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="m_title">Micro ATM</string>
+    <string name="m_intro">Use the card reader to let a customer check their balance or withdraw cash from their debit card.</string>
+
+    <string name="m_type_withdraw">Cash withdrawal</string>
+    <string name="m_type_balance">Balance enquiry</string>
+
+    <string name="m_mobile">Customer mobile</string>
+    <string name="m_mobile_hint">10-digit mobile number</string>
+    <string name="m_amount">Amount</string>
+    <string name="m_amount_hint">Withdrawal amount (₹)</string>
+
+    <string name="m_err_mobile">Enter a valid 10-digit mobile number</string>
+    <string name="m_err_amount">Enter a valid amount</string>
+
+    <string name="m_location_hint">Turn on location — Micro ATM transactions must be tagged with your location.</string>
+    <string name="m_device_note">Keep the card reader paired and charged. The customer taps/dips the card and enters their PIN on the reader.</string>
+    <string name="m_cancelled">Transaction cancelled.</string>
+
+    <string name="m_cta_withdraw">Start withdrawal</string>
+    <string name="m_cta_balance">Check balance</string>
+
+    <!-- Receipt -->
+    <string name="m_receipt_title">Micro ATM receipt</string>
+    <string name="m_receipt_footer">Computer-generated receipt · no signature needed</string>
+    <string name="m_status_success">SUCCESS</string>
+    <string name="m_status_failed">FAILED</string>
+    <string name="m_server_warning">The bank result is in, but we could not confirm it with the server. Check the Micro ATM report before handing over cash.</string>
+    <string name="m_commission">You earned %1$s commission</string>
+
+    <string name="m_r_type">Type</string>
+    <string name="m_r_amount">Amount</string>
+    <string name="m_r_balance">Available balance</string>
+    <string name="m_r_card">Card</string>
+    <string name="m_r_bank">Bank</string>
+    <string name="m_r_rrn">Bank RRN</string>
+    <string name="m_r_terminal">Terminal ID</string>
+    <string name="m_r_txn">Txn ID</string>
+    <string name="m_r_message">Message</string>
+
+    <string name="m_act_whatsapp">WhatsApp</string>
+    <string name="m_act_save">Save PDF</string>
+    <string name="m_act_print">Print</string>
+    <string name="m_act_help">Help</string>
+    <string name="m_share_title">Micro ATM receipt</string>
+    <string name="m_print_title">Print receipt</string>
+    <string name="m_print_thermal">Thermal printer</string>
+    <string name="m_print_a4">A4 / PDF</string>
+
+    <string name="m_new_txn">New transaction</string>
+    <string name="m_done">Done</string>
+</resources>

@@ -61,6 +61,7 @@
     <string name="rp_p_7">7 days</string>
     <string name="rp_p_this_month">This month</string>
     <string name="rp_p_last_month">Last month</string>
+    <string name="rp_p_30_days">Last 30 days</string>
     <string name="rp_p_3_months">Last 3 months</string>
     <string name="rp_p_custom">Custom</string>
     <string name="rp_err_from_after">The start date is after the end date</string>
@@ -153,6 +154,10 @@
     <!-- 6.5 statement -->
     <string name="rp_period">Period</string>
     <string name="rp_make_pdf">Make PDF</string>
+    <string name="rp_view_statement">View statement</string>
+    <string name="rp_statement_view_title">Statement</string>
+    <string name="rp_download_pdf">Download PDF</string>
+    <string name="rp_change_period">Change period</string>
     <string name="rp_statement_note">Up to 3 months at a time · takes a few seconds</string>
     <string name="rp_statement_doc_title">Wallet statement</string>
     <string name="rp_statement_period">%1$s to %2$s</string>

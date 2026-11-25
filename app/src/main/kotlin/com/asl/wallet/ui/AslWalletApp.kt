@@ -56,6 +56,8 @@ import com.asl.wallet.feature.bbps.ui.bbpsGraph
 import com.asl.wallet.feature.recharge.ui.rechargeGraph
 import com.asl.wallet.feature.dmt.ui.DmtRoutes
 import com.asl.wallet.feature.dmt.ui.dmtGraph
+import com.asl.wallet.feature.matm.ui.MatmRoutes
+import com.asl.wallet.feature.matm.ui.matmGraph
 import com.asl.wallet.feature.reports.ui.ReportsRoutes
 import com.asl.wallet.feature.reports.ui.ReportsTab
 import com.asl.wallet.feature.reports.ui.reportsGraph
@@ -247,6 +249,7 @@ private fun AppNavHost(nav: NavHostController, vm: AppViewModel, ui: AppUiState,
                             ServiceCatalogue.AEPS_MODULE -> aepsChooser = true
                             ServiceCatalogue.RECHARGE_MODULE -> nav.navigate(RechargeRoutes.recharge(if ("dth" in key) RechargeType.Dth else RechargeType.Mobile))
                             ServiceCatalogue.DMT_MODULE -> nav.navigate(DmtRoutes.DMT)
+                            ServiceCatalogue.MATM_MODULE -> nav.navigate(MatmRoutes.MATM)
                             ServiceCatalogue.PAYOUT_MODULE -> { nav.navigate(WalletRoutes.GRAPH); nav.navigate(WalletRoutes.SEND) }
                             ServiceCatalogue.BBPS_MODULE -> nav.navigate(BbpsRoutes.bbps(BbpsRoutes.categoryForService(key)))
                         }
@@ -310,6 +313,7 @@ private fun AppNavHost(nav: NavHostController, vm: AppViewModel, ui: AppUiState,
                         ServiceCatalogue.AEPS_MODULE -> aepsChooser = true
                         ServiceCatalogue.RECHARGE_MODULE -> nav.navigate(RechargeRoutes.recharge(if ("dth" in key) RechargeType.Dth else RechargeType.Mobile))
                         ServiceCatalogue.DMT_MODULE -> nav.navigate(DmtRoutes.DMT)
+                        ServiceCatalogue.MATM_MODULE -> nav.navigate(MatmRoutes.MATM)
                         ServiceCatalogue.PAYOUT_MODULE -> { nav.navigate(WalletRoutes.GRAPH); nav.navigate(WalletRoutes.SEND) }
                         ServiceCatalogue.BBPS_MODULE -> nav.navigate(BbpsRoutes.bbps(BbpsRoutes.categoryForService(key)))
                     }
@@ -425,6 +429,15 @@ private fun AppNavHost(nav: NavHostController, vm: AppViewModel, ui: AppUiState,
             onFundRequest = { nav.navigate(WalletRoutes.GRAPH); nav.navigate(WalletRoutes.FUND) },
             onCallSupport = { openDialer(context, vm.support.phone) },
             onWhatsAppSupport = { openWhatsApp(context, vm.support.whatsapp) },
+        )
+        // Module 7 · Micro ATM
+        matmGraph(
+            shop = {
+                val u by vm.currentUser.user.collectAsStateWithLifecycle()
+                ShopInfo(u?.shopName?.ifBlank { null } ?: u?.name.orEmpty(), u?.regno?.let { "R-$it" }.orEmpty(), u?.address.orEmpty(), phone = u?.phone.orEmpty(), ownerName = u?.name.orEmpty())
+            },
+            onBack = { nav.popBackStack() },
+            onHelp = { openWhatsApp(context, vm.support.whatsapp) },
         )
         // Module 6 · Reports
         reportsGraph(

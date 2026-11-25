@@ -177,6 +177,7 @@ dependencies {
     implementation(project(":feature:home"))
     implementation(project(":feature:profile"))
     implementation(project(":feature:aeps"))
+    implementation(project(":feature:matm"))
     implementation(project(":feature:wallet"))
     implementation(project(":feature:recharge"))
     implementation(project(":feature:bbps"))

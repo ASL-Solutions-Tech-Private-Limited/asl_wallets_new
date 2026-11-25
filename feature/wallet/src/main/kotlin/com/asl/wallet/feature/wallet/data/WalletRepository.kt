@@ -286,7 +286,7 @@ class WalletRepositoryImpl @Inject constructor(
         const val PAGE = 20
         /** Used only if the server sends no limits; the server checks again either way. */
         val DEFAULT_ADD_LIMITS = Limits(BigDecimal(500), BigDecimal(2000))
-        val DEFAULT_SEND_LIMITS = Limits(BigDecimal(10), BigDecimal(50000))
+        val DEFAULT_SEND_LIMITS = Limits(BigDecimal(100), BigDecimal(50000))
         /** The payout API's paymentMode values (like DMT): IMPS first (instant). */
         val PAYOUT_MODES = listOf("IMPS", "NEFT")
         private val STATUS_QUERY = mapOf(FundStatus.Pending to "pending", FundStatus.Approved to "transferred", FundStatus.Declined to "declined")

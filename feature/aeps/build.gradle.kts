@@ -35,6 +35,9 @@ dependencies {
     implementation(libs.hilt.navigation.compose)
     ksp(libs.hilt.compiler)
 
+    // Fused location (robust indoor fixes for the geo-tagged AEPS flow).
+    implementation(libs.play.services.location)
+
     testImplementation(project(":core:testing"))
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.retrofit.kotlinx.serialization)

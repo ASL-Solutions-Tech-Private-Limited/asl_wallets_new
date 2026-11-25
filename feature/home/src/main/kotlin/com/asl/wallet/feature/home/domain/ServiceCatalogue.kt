@@ -12,10 +12,13 @@ import java.net.URI
 object ServiceCatalogue {
 
     /** Build modules whose screens exist in this app. A service becomes tappable when its module ships. */
-    val BUILT_MODULES: Set<Int> = setOf(AEPS_MODULE, PAYOUT_MODULE, RECHARGE_MODULE, DMT_MODULE, BBPS_MODULE)
+    val BUILT_MODULES: Set<Int> = setOf(AEPS_MODULE, PAYOUT_MODULE, RECHARGE_MODULE, DMT_MODULE, BBPS_MODULE, MATM_MODULE)
 
     /** AEPS (with its own onboarding/eKYC) ships in Module 3. */
     const val AEPS_MODULE = 3
+
+    /** Micro ATM (debit-card cash withdrawal / balance via the FingPay mPOS reader) ships in Module 7. */
+    const val MATM_MODULE = 7
 
     /** Payout = send to the retailer's own bank account, built in the Wallet (Module 4). */
     const val PAYOUT_MODULE = 4
@@ -48,7 +51,7 @@ object ServiceCatalogue {
         val n = " " + name.lowercase().replace(Regex("[^a-z0-9]+"), " ").trim() + " "
         fun has(vararg w: String) = w.any { n.contains(it) }
         return when {
-            has("micro atm", "matm", "mini atm") -> ServiceKind.MicroAtm to 7
+            has("micro atm", "matm", "mini atm") -> ServiceKind.MicroAtm to MATM_MODULE
             has("aeps", "aadhaar enabled") -> ServiceKind.Aeps to AEPS_MODULE
             has("dmt", "money transfer", "domestic", "remit") -> ServiceKind.MoneyTransfer to DMT_MODULE
             has("payout", "settlement", "send to bank") -> ServiceKind.MoneyTransfer to PAYOUT_MODULE

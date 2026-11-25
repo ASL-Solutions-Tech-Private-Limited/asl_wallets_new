@@ -8,9 +8,11 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.location.Location
 import android.location.LocationManager
-import android.os.Build
-import android.os.CancellationSignal
 import androidx.core.content.ContextCompat
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
+import com.google.android.gms.tasks.Task
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -43,33 +45,57 @@ class AndroidLocationSource @Inject constructor(@ApplicationContext private val 
 
     override fun isEnabled() = runCatching { lm.isProviderEnabled(LocationManager.GPS_PROVIDER) || lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER) }.getOrDefault(false)
 
+    private val fused by lazy { LocationServices.getFusedLocationProviderClient(context) }
+
+    /**
+     * Order of preference (never fails just because GPS is cold indoors):
+     *  1. A recent cached fix (< 2 min) from the platform — instant.
+     *  2. A fresh fix from the fused provider (uses GPS + Wi-Fi + cell; resolves indoors), up to [FIX_TIMEOUT_MS].
+     *  3. The fused provider's last known location.
+     *  4. The most recent last-known fix from any platform provider, even if stale — a slightly old
+     *     location beats failing a transaction, which is what used to happen on the first attempt.
+     */
     @SuppressLint("MissingPermission")
     override suspend fun current(): GeoPoint? {
         if (!hasPermission() || !isEnabled()) return null
-        val recent = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+
+        recentCached()?.let { return it.toPoint() }
+
+        val fresh = withTimeoutOrNull(FIX_TIMEOUT_MS) {
+            val cts = CancellationTokenSource()
+            try {
+                fused.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token).await()
+            } finally {
+                cts.cancel()
+            }
+        }
+        if (fresh != null) return fresh.toPoint()
+
+        runCatching { fused.lastLocation.await() }.getOrNull()?.let { return it.toPoint() }
+
+        return lastKnownAnyAge()?.toPoint()
+    }
+
+    /** A cached platform fix younger than [MAX_AGE_MS], best accuracy first. */
+    @SuppressLint("MissingPermission")
+    private fun recentCached(): Location? =
+        listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
             .mapNotNull { runCatching { lm.getLastKnownLocation(it) }.getOrNull() }
             .filter { System.currentTimeMillis() - it.time < MAX_AGE_MS }
             .minByOrNull { it.accuracy }
-        if (recent != null) return recent.toPoint()
-        val provider = if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) LocationManager.GPS_PROVIDER else LocationManager.NETWORK_PROVIDER
-        return withTimeoutOrNull(FIX_TIMEOUT_MS) { fresh(provider) }?.toPoint()
-    }
 
+    /** The most recent last-known fix from any provider, any age (last-resort fallback). */
     @SuppressLint("MissingPermission")
-    private suspend fun fresh(provider: String): Location? = suspendCancellableCoroutine { cont ->
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val signal = CancellationSignal()
-            cont.invokeOnCancellation { signal.cancel() }
-            lm.getCurrentLocation(provider, signal, ContextCompat.getMainExecutor(context)) { cont.resume(it) }
-        } else {
-            @Suppress("DEPRECATION")
-            lm.requestSingleUpdate(provider, object : android.location.LocationListener {
-                override fun onLocationChanged(l: Location) { if (cont.isActive) cont.resume(l) }
-                @Deprecated("") override fun onStatusChanged(p: String?, s: Int, e: android.os.Bundle?) {}
-                override fun onProviderEnabled(p: String) {}
-                override fun onProviderDisabled(p: String) { if (cont.isActive) cont.resume(null) }
-            }, android.os.Looper.getMainLooper())
-        }
+    private fun lastKnownAnyAge(): Location? =
+        listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER)
+            .mapNotNull { runCatching { lm.getLastKnownLocation(it) }.getOrNull() }
+            .maxByOrNull { it.time }
+
+    /** Awaits a Play-services [Task], returning null on failure/cancellation instead of throwing. */
+    private suspend fun <T> Task<T>.await(): T? = suspendCancellableCoroutine { cont ->
+        addOnSuccessListener { if (cont.isActive) cont.resume(it) }
+        addOnFailureListener { if (cont.isActive) cont.resume(null) }
+        addOnCanceledListener { if (cont.isActive) cont.resume(null) }
     }
 
     private fun Location.toPoint() = GeoPoint(latitude, longitude)

@@ -225,13 +225,17 @@ sealed interface StatementState {
 @HiltViewModel
 class StatementViewModel @Inject constructor(private val repo: ReportsRepository) : ViewModel() {
     var today: () -> Day = { Day.today() }
-    private val _period = MutableStateFlow(Periods.of(Preset.LastMonth, Day.today()))
+    // Default: the last 30 days ending today (a rolling window, not the previous calendar month).
+    private val _period = MutableStateFlow(Day.today().let { Period(it.plusDays(-30), it, Preset.Custom) })
     val period: StateFlow<Period> = _period.asStateFlow()
     private val _state = MutableStateFlow<StatementState>(StatementState.Idle)
     val state: StateFlow<StatementState> = _state.asStateFlow()
 
     fun setPreset(p: Preset) { _period.value = Periods.of(p, today()); _state.value = StatementState.Idle }
     fun setCustom(from: Day, to: Day) { _period.value = Period(from, to, Preset.Custom); _state.value = StatementState.Idle }
+
+    /** Last 30 days = from 30 days ago until today (rolling). */
+    fun last30Days() { val t = today(); _period.value = Period(t.plusDays(-30), t, Preset.Custom); _state.value = StatementState.Idle }
 
     /** Last 3 months = from the same day 3 months ago until today. */
     fun lastThreeMonths() { val t = today(); _period.value = Period(t.minusMonths(Periods.MAX_MONTHS).plusDays(1), t, Preset.Custom); _state.value = StatementState.Idle }

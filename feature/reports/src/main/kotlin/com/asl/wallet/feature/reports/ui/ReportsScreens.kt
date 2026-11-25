@@ -95,6 +95,7 @@ import com.asl.wallet.core.designsystem.icon.AslIcons
 import com.asl.wallet.core.designsystem.receipt.ReceiptDoc
 import com.asl.wallet.core.designsystem.receipt.ReceiptExport
 import com.asl.wallet.core.designsystem.receipt.StatementDoc
+import com.asl.wallet.feature.reports.data.StatementData
 import com.asl.wallet.core.designsystem.theme.AslGradients
 import com.asl.wallet.core.designsystem.theme.AslShapes
 import com.asl.wallet.core.designsystem.theme.AslTheme
@@ -472,14 +473,16 @@ fun LedgerScreen(shop: ShopInfo, onBack: () -> Unit, vm: LedgerViewModel = hiltV
 }
 
 @Composable
-private fun LedgerRow(e: LedgerEntry, onClick: () -> Unit) {
+private fun LedgerRow(e: LedgerEntry, onClick: (() -> Unit)? = null) {
     val c = AslTheme.colors
     val tone = if (e.isCredit) c.success else c.error
     // Each row fades and lifts into place when it first appears (and as it scrolls into view).
     val appear = remember(e.id) { Animatable(0f) }
     LaunchedEffect(e.id) { appear.animateTo(1f, tween(320, easing = FastOutSlowInEasing)) }
     Row(
-        Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick).padding(vertical = 10.dp)
+        Modifier.fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
+            .padding(vertical = 10.dp)
             .graphicsLayer { alpha = appear.value; translationY = (1f - appear.value) * 22f },
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -784,50 +787,27 @@ private fun DayPicker(initial: Day, today: Day, onDismiss: () -> Unit, onPick: (
 fun StatementScreen(shop: ShopInfo, onBack: () -> Unit, vm: StatementViewModel = hiltViewModel()) {
     val period by vm.period.collectAsStateWithLifecycle()
     val state by vm.state.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val today = remember { Day.today() }
     var picking by remember { mutableStateOf<Int?>(null) }
-    var file by remember { mutableStateOf<java.io.File?>(null) }
-    var presetIdx by rememberSaveable { mutableStateOf(1) }
+    var presetIdx by rememberSaveable { mutableStateOf(0) } // default: Last 30 days (the first chip)
     val check = Periods.check(period.from, period.to, today, lookbackLimited = false)
-    val shareTitle = stringResource(R.string.rp_share_title)
 
-    // Strings for the PDF, read here (a composable context).
-    val docTitle = stringResource(R.string.rp_statement_doc_title)
-    val periodLine = stringResource(R.string.rp_statement_period, period.from.label(), period.to.label())
-    val header = listOf(stringResource(R.string.rp_h_date), stringResource(R.string.rp_h_entry), stringResource(R.string.rp_h_dr), stringResource(R.string.rp_h_cr), stringResource(R.string.rp_h_bal))
-    val openingLabel = stringResource(R.string.rp_opening_short)
-    val closingLabel = stringResource(R.string.rp_closing_short)
-    val footer = stringResource(R.string.rp_statement_footer)
-
-    LaunchedEffect(state) {
-        val s = state as? StatementState.Ready ?: return@LaunchedEffect
-        if (s.data.entries.isEmpty()) return@LaunchedEffect
-        val plain = { a: BigDecimal -> Money.format(a, withSymbol = false) }
-        val e = s.data.entries
-        val doc = StatementDoc(
-            shop = shop, title = docTitle, periodLine = periodLine, header = header,
-            rows = e.map { listOf(it.day?.let { d -> "%02d-%02d-%02d".format(d.day, d.month, d.year % 100) }.orEmpty(), it.description,
-                it.debit.takeIf { d -> d.signum() > 0 }?.let(plain).orEmpty(), it.credit.takeIf { cr -> cr.signum() > 0 }?.let(plain).orEmpty(), it.closing?.let(plain).orEmpty()) },
-            opening = e.first().opening?.let(plain), closing = e.last().closing?.let(plain),
-            totalDebit = plain(e.fold(BigDecimal.ZERO) { acc, x -> acc + x.debit }), totalCredit = plain(e.fold(BigDecimal.ZERO) { acc, x -> acc + x.credit }),
-            openingLabel = openingLabel, closingLabel = closingLabel, footer = footer,
-            fileName = "ASL-statement-${s.period.from.iso()}-to-${s.period.to.iso()}.pdf",
-        )
-        val f = withContext(Dispatchers.IO) { runCatching { ReceiptExport.writeStatementPdf(context, doc) }.getOrNull() }
-        file = f
-        if (f != null) ReceiptExport.shareStatementPdf(context, f, shareTitle)
+    // Once the entries are loaded, show them on screen so the retailer can read the statement.
+    // Changing the period ("Change period") brings this picker back.
+    val ready = state as? StatementState.Ready
+    if (ready != null && ready.data.entries.isNotEmpty()) {
+        StatementList(shop, ready.period, ready.data, onBack = vm::reset)
+        return
     }
 
     Scaffold(stringResource(R.string.rp_statement), onBack, bottom = {
-        AslPrimaryButton(stringResource(R.string.rp_make_pdf), { file = null; vm.make() }, enabled = check == Periods.Check.Ok && state != StatementState.Loading,
+        AslPrimaryButton(stringResource(R.string.rp_view_statement), vm::make, enabled = check == Periods.Check.Ok && state != StatementState.Loading,
             loading = state == StatementState.Loading, icon = AslIcons.Document)
     }) {
         Text(stringResource(R.string.rp_period), style = AslTheme.type.label, color = AslTheme.colors.textSecondary)
-        ChoiceChips(listOf(stringResource(R.string.rp_p_this_month), stringResource(R.string.rp_p_last_month), stringResource(R.string.rp_p_3_months), stringResource(R.string.rp_p_custom)), presetIdx, { i ->
+        ChoiceChips(listOf(stringResource(R.string.rp_p_30_days), stringResource(R.string.rp_p_this_month), stringResource(R.string.rp_p_3_months), stringResource(R.string.rp_p_custom)), presetIdx, { i ->
             presetIdx = i
-            when (i) { 0 -> vm.setPreset(Preset.ThisMonth); 1 -> vm.setPreset(Preset.LastMonth); 2 -> vm.lastThreeMonths(); else -> picking = 0 }
+            when (i) { 0 -> vm.last30Days(); 1 -> vm.setPreset(Preset.ThisMonth); 2 -> vm.lastThreeMonths(); else -> picking = 0 }
         })
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             DateBox(stringResource(R.string.rp_from), period.from, Modifier.weight(1f)) { picking = 0 }
@@ -842,14 +822,7 @@ fun StatementScreen(shop: ShopInfo, onBack: () -> Unit, vm: StatementViewModel =
         Text(stringResource(R.string.rp_statement_note), style = AslTheme.type.caption, color = AslTheme.colors.textSecondary, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
         when (val s = state) {
             is StatementState.Error -> AlertBanner(AlertKind.Error, errorText(s.e))
-            is StatementState.Ready -> {
-                if (s.data.entries.isEmpty()) AlertBanner(AlertKind.Info, stringResource(R.string.rp_statement_empty))
-                else {
-                    AlertBanner(AlertKind.Success, stringResource(R.string.rp_statement_ready, s.data.entries.size))
-                    if (s.data.truncated) AlertBanner(AlertKind.Pending, stringResource(R.string.rp_statement_truncated, ReportRules.STATEMENT_MAX))
-                    file?.let { f -> AslButton(stringResource(R.string.rp_share), { scope.launch { ReceiptExport.shareStatementPdf(context, f, shareTitle) } }, Modifier.fillMaxWidth(), style = AslButtonStyle.Outline, icon = AslIcons.Share) }
-                }
-            }
+            is StatementState.Ready -> if (s.data.entries.isEmpty()) AlertBanner(AlertKind.Info, stringResource(R.string.rp_statement_empty))
             else -> Unit
         }
     }
@@ -858,5 +831,87 @@ fun StatementScreen(shop: ShopInfo, onBack: () -> Unit, vm: StatementViewModel =
             picking = null; presetIdx = 3
             if (which == 0) vm.setCustom(d, period.to) else vm.setCustom(period.from, d)
         }
+    }
+}
+
+/** The loaded statement, on screen: a summary, the entries grouped by day (newest first), and a Download-PDF action. */
+@Composable
+private fun StatementList(shop: ShopInfo, period: Period, data: StatementData, onBack: () -> Unit) {
+    BackHandler(onBack = onBack)
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val c = AslTheme.colors
+    val today = remember { Day.today() }
+    val entries = data.entries // oldest first
+    val totalDebit = remember(entries) { entries.fold(BigDecimal.ZERO) { a, x -> a + x.debit } }
+    val totalCredit = remember(entries) { entries.fold(BigDecimal.ZERO) { a, x -> a + x.credit } }
+    val opening = entries.firstOrNull()?.opening
+    val closing = entries.lastOrNull()?.closing
+
+    // Strings for the PDF, read here (a composable context); the file is built only when Download is tapped.
+    val shareTitle = stringResource(R.string.rp_share_title)
+    val docTitle = stringResource(R.string.rp_statement_doc_title)
+    val periodLine = stringResource(R.string.rp_statement_period, period.from.label(), period.to.label())
+    val header = listOf(stringResource(R.string.rp_h_date), stringResource(R.string.rp_h_entry), stringResource(R.string.rp_h_dr), stringResource(R.string.rp_h_cr), stringResource(R.string.rp_h_bal))
+    val openingLabel = stringResource(R.string.rp_opening_short)
+    val closingLabel = stringResource(R.string.rp_closing_short)
+    val footer = stringResource(R.string.rp_statement_footer)
+    var generating by remember { mutableStateOf(false) }
+
+    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding()) {
+        AslTopBar(stringResource(R.string.rp_statement_view_title), onBack = onBack)
+        LazyColumn(Modifier.weight(1f), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp)) {
+            item {
+                AslCard {
+                    Text(periodLine, style = AslTheme.type.label, color = c.textPrimary)
+                    Spacer(Modifier.height(4.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        StatementBalance(stringResource(R.string.rp_opening), opening, Alignment.Start)
+                        StatementBalance(stringResource(R.string.rp_closing), closing, Alignment.End)
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    MoneyFlowTiles(totalCredit, totalDebit)
+                    Spacer(Modifier.height(8.dp))
+                    Text(stringResource(R.string.rp_entries, entries.size), style = AslTheme.type.caption, color = c.textSecondary)
+                }
+            }
+            if (data.truncated) item { Spacer(Modifier.height(10.dp)); AlertBanner(AlertKind.Pending, stringResource(R.string.rp_statement_truncated, ReportRules.STATEMENT_MAX)) }
+            // Read newest first on screen (the PDF stays chronological).
+            ReportRules.byDay(entries.asReversed()) { it.day }.forEach { (d, list) ->
+                item(key = "sh-${d?.iso()}-${list.first().id}") { SectionHeader(if (d == today) stringResource(R.string.rp_today) else d?.label().orEmpty(), Modifier.padding(top = 12.dp, bottom = 8.dp)) }
+                list.forEachIndexed { i, en -> item(key = "se-${en.id}") { Cell(i, list.size) { LedgerRow(en) } } }
+            }
+            item { Spacer(Modifier.navigationBarsPadding()) }
+        }
+        Column(Modifier.fillMaxWidth().background(c.surface).navigationBarsPadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            AslPrimaryButton(stringResource(R.string.rp_download_pdf), {
+                if (generating) return@AslPrimaryButton
+                generating = true
+                scope.launch {
+                    val plain = { a: BigDecimal -> Money.format(a, withSymbol = false) }
+                    val doc = StatementDoc(
+                        shop = shop, title = docTitle, periodLine = periodLine, header = header,
+                        rows = entries.map { listOf(it.day?.let { d -> "%02d-%02d-%02d".format(d.day, d.month, d.year % 100) }.orEmpty(), it.description,
+                            it.debit.takeIf { x -> x.signum() > 0 }?.let(plain).orEmpty(), it.credit.takeIf { x -> x.signum() > 0 }?.let(plain).orEmpty(), it.closing?.let(plain).orEmpty()) },
+                        opening = opening?.let(plain), closing = closing?.let(plain),
+                        totalDebit = plain(totalDebit), totalCredit = plain(totalCredit),
+                        openingLabel = openingLabel, closingLabel = closingLabel, footer = footer,
+                        fileName = "ASL-statement-${period.from.iso()}-to-${period.to.iso()}.pdf",
+                    )
+                    val f = withContext(Dispatchers.IO) { runCatching { ReceiptExport.writeStatementPdf(context, doc) }.getOrNull() }
+                    generating = false
+                    if (f != null) ReceiptExport.shareStatementPdf(context, f, shareTitle)
+                }
+            }, loading = generating, icon = AslIcons.Document)
+            AslButton(stringResource(R.string.rp_change_period), onBack, Modifier.fillMaxWidth(), style = AslButtonStyle.Outline, icon = AslIcons.Calendar)
+        }
+    }
+}
+
+@Composable
+private fun StatementBalance(label: String, amount: BigDecimal?, align: Alignment.Horizontal) {
+    Column(horizontalAlignment = align) {
+        Text(label, style = AslTheme.type.micro, color = AslTheme.colors.textSecondary)
+        Text(rupees(amount), style = AslTheme.type.label, color = AslTheme.colors.textPrimary)
     }
 }

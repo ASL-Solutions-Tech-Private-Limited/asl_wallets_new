@@ -459,6 +459,7 @@ private object TestUser : com.asl.wallet.core.common.session.CurrentUser {
     override val user = kotlinx.coroutines.flow.MutableStateFlow<com.asl.wallet.core.common.session.UserSummary?>(
         com.asl.wallet.core.common.session.UserSummary("Ajay Kumar", "ASL Payzones", 6044, "Retailer", true),
     )
+    override fun updateAddress(address: String) = Unit
     override suspend fun logout() = Unit
 }
 

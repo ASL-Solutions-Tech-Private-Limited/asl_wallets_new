@@ -133,6 +133,7 @@
     <string name="ae_wallet_note_sub">জমার টাকা আপনার ASL ওয়ালেট থেকে নেওয়া হবে</string>
     <string name="ae_otp_customer">গ্রাহকের কাছে OTP চান</string>
     <string name="ae_otp_customer_sub">ব্যাংক %1$s-এ পাঠিয়েছে</string>
+    <string name="ae_otp_secure_note">৪,০০০ টাকার বেশি উত্তোলনে প্রয়োজন (NPCI)</string>
     <string name="ae_cancel">বাতিল</string>
     <string name="ae_processing">%1$s চলছে</string>
     <string name="ae_p_captured">আঙুলের ছাপ নেওয়া হয়েছে</string>

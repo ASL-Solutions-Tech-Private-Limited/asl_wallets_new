@@ -2,14 +2,14 @@
 <resources>
     <string name="ae_choose">Choose AEPS bank</string>
     <string name="ae_last_choice">Your last choice is remembered</string>
-    <string name="ae_kotak_sub">Withdraw · Balance · Statement</string>
+    <string name="ae_kotak_sub">Withdraw Â· Balance Â· Statement</string>
     <string name="ae_yes_sub">Also cash deposit</string>
     <string name="ae_badge_ready">Ready</string>
     <string name="ae_badge_login">Login due</string>
     <string name="ae_badge_setup">Set-up needed</string>
     <string name="ae_badge_off">Not available</string>
     <string name="ae_badge_last">Last used</string>
-    <string name="ae_title">AEPS · %1$s</string>
+    <string name="ae_title">AEPS Â· %1$s</string>
     <string name="ae_checking">Checking your AEPS set-up</string>
     <string name="ae_step_account">Account found</string>
     <string name="ae_step_kyc">Checking eKYC and daily login</string>
@@ -78,7 +78,7 @@
     <string name="ae_doc_pan">PAN card</string>
     <string name="ae_doc_shop">Shop photo with signboard</string>
     <string name="ae_doc_take">Tap to take a photo</string>
-    <string name="ae_doc_done">Added · %1$s</string>
+    <string name="ae_doc_done">Added Â· %1$s</string>
     <string name="ae_change">Change</string>
     <string name="ae_submit">Submit</string>
     <string name="ae_otp_title">Enter the 6-digit OTP</string>
@@ -91,14 +91,14 @@
     <string name="ae_scan">Scan fingerprint</string>
     <string name="ae_scan_face">Scan face</string>
     <string name="ae_done_title">AEPS set up</string>
-    <string name="ae_done_sub">%1$s · approved</string>
+    <string name="ae_done_sub">%1$s Â· approved</string>
     <string name="ae_outlet">Outlet ID</string>
     <string name="ae_bv_title">Verify settlement bank</string>
     <string name="ae_bv_info">One-time check by %1$s</string>
     <string name="ae_bv_info_sub">Needed before your first withdrawal</string>
-    <string name="ae_sending_otp">Sending OTP…</string>
+    <string name="ae_sending_otp">Sending OTPâ¦</string>
     <string name="ae_verify_scan">Verify and scan finger</string>
-    <string name="ae_bk_title">%1$s · biometric KYC</string>
+    <string name="ae_bk_title">%1$s Â· biometric KYC</string>
     <string name="ae_bk_info">One-time fingerprint KYC</string>
     <string name="ae_bk_info_sub">%1$s needs this once before AEPS</string>
     <string name="ae_dl_title">Daily AEPS login</string>
@@ -122,9 +122,9 @@
     <string name="ae_search_bank">Search bank name</string>
     <string name="ae_recent">Popular</string>
     <string name="ae_results">All banks</string>
-    <string name="ae_more_banks">Search…</string>
+    <string name="ae_more_banks">Searchâ¦</string>
     <string name="ae_amount">Amount</string>
-    <string name="ae_amount_rule">₹100 – ₹10,000, whole rupees</string>
+    <string name="ae_amount_rule">â¹100 â â¹10,000, whole rupees</string>
     <string name="ae_aadhaar_bad">Enter a valid 12-digit Aadhaar</string>
     <string name="ae_mobile_bad">Enter a valid 10-digit mobile</string>
     <string name="ae_bank_needed">Choose the customer\'s bank</string>
@@ -133,6 +133,7 @@
     <string name="ae_wallet_note_sub">The deposit amount is taken from your ASL wallet</string>
     <string name="ae_otp_customer">Ask the customer for the OTP</string>
     <string name="ae_otp_customer_sub">Sent by the bank to %1$s</string>
+    <string name="ae_otp_secure_note">Required for withdrawals above ₹4,000 (NPCI)</string>
     <string name="ae_cancel">Cancel</string>
     <string name="ae_processing">%1$s in progress</string>
     <string name="ae_p_captured">Fingerprint captured</string>
@@ -148,7 +149,7 @@
     <string name="ae_r_ref">Bank ref</string>
     <string name="ae_r_date">Date</string>
     <string name="ae_r_via">Via</string>
-    <string name="ae_r_note">Computer-generated receipt · no signature needed</string>
+    <string name="ae_r_note">Computer-generated receipt Â· no signature needed</string>
     <string name="ae_share">Share</string>
     <string name="ae_pdf">Save PDF</string>
     <string name="ae_print">Print</string>
@@ -159,7 +160,7 @@
     <string name="ae_same_again">Same customer again</string>
     <string name="ae_new_customer">New customer</string>
     <string name="ae_home">Home</string>
-    <string name="ae_balance_of">Account balance · %1$s · %2$s</string>
+    <string name="ae_balance_of">Account balance Â· %1$s Â· %2$s</string>
     <string name="ae_statement">Mini statement</string>
     <string name="ae_col_date">Date</string>
     <string name="ae_col_narration">Narration</string>

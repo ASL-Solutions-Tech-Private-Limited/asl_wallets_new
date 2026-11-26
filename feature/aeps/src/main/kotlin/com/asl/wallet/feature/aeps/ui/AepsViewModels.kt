@@ -531,12 +531,12 @@ class AepsTransactionViewModel @Inject constructor(
 
     /** The bank's OTP reference goes with the transaction; the code itself goes into the PID options. */
     fun otpEntered(): Boolean {
-        if (_state.value.otp.length < 4) return false
+        if (_state.value.otp.length != 6) return false
         otpTxnId = pendingOtpRef
         return true
     }
 
-    /** Customer OTP to put into the scan (only during the above-₹5,000 flow). */
+    /** Customer OTP to put into the scan (only during the above-₹4,000 flow). */
     val scanOtp: String? get() = _state.value.otp.takeIf { otpTxnId != null && it.isNotEmpty() }
 
     fun cancelOtp() { timer?.cancel(); otpTxnId = null; pendingOtpRef = null; _state.update { it.copy(phase = TxnPhase.Form, otp = "") } }

@@ -15,6 +15,8 @@ import androidx.compose.foundation.relocation.BringIntoViewRequester
 
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -266,12 +268,16 @@ fun OtpInput(
     modifier: Modifier = Modifier,
     length: Int = 4,
     isError: Boolean = false,
+    autoFocus: Boolean = false,
     onComplete: (String) -> Unit = {},
 ) {
     val c = AslTheme.colors
     val blink = rememberInfiniteTransition(label = "caret")
     val caretAlpha by blink.animateFloat(1f, 0f, infiniteRepeatable(tween(500), RepeatMode.Reverse), label = "caretA")
     val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    val focus = remember { FocusRequester() }
+    // Open the field and raise the keyboard as the screen appears, so the retailer can type at once.
+    if (autoFocus) LaunchedEffect(Unit) { focus.requestFocus(); keyboard?.show() }
     BasicTextField(
         value = value,
         onValueChange = { raw ->
@@ -282,7 +288,7 @@ fun OtpInput(
         },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
         keyboardActions = rememberImeActions(ImeAction.Done),
-        modifier = modifier.semantics { contentDescription = "One-time code, $length digits" },
+        modifier = modifier.focusRequester(focus).semantics { contentDescription = "One-time code, $length digits" },
         decorationBox = {
             Row(horizontalArrangement = Arrangement.spacedBy(if (length == 6) 8.dp else 10.dp), modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Row(Modifier.weight(1f)) {}

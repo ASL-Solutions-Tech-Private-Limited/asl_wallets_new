@@ -65,11 +65,11 @@ fun AgentStatus.nextStep(provider: AepsProvider): NextStep = when {
 enum class TxnType(val code: String, val needsAmount: Boolean) {
     Withdraw("CW", true), Balance("BE", false), Statement("MS", false), Deposit("CD", true);
 
-    /** Above ₹5,000 the bank sends the customer an OTP first (cash withdrawal only here). */
+    /** Above ₹4,000 the bank sends the customer an OTP first (cash withdrawal only here). NPCI limit, Nov 2026. */
     fun needsCustomerOtp(amount: BigDecimal?): Boolean = this == Withdraw && amount != null && amount > OTP_THRESHOLD
 
     companion object {
-        val OTP_THRESHOLD: BigDecimal = BigDecimal(5000)
+        val OTP_THRESHOLD: BigDecimal = BigDecimal(4000)
         fun forProvider(p: AepsProvider) = if (p.supportsDeposit) entries.toList() else entries.filter { it != Deposit }
     }
 }

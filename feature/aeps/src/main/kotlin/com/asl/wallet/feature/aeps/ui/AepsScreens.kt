@@ -187,6 +187,26 @@ private fun ResendRow(resendIn: Int, onResend: () -> Unit) {
     else AslButton(stringResource(R.string.ae_resend), onResend, style = AslButtonStyle.Outline, compact = true, icon = AslIcons.Refresh)
 }
 
+/** The high-value (> ₹4,000) customer OTP step: a single focused card with a secure badge, the masked number, the code boxes and resend. */
+@Composable
+private fun CustomerOtpCard(mobile: String, otp: String, onOtp: (String) -> Unit, error: String?, resendIn: Int, onResend: () -> Unit) {
+    val c = AslTheme.colors
+    AslCard {
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            BigIcon(AslIcons.Shield, c.heroGradient, size = 72.dp)
+            Text(stringResource(R.string.ae_otp_customer), style = AslTheme.type.bodyStrong, color = c.textPrimary, textAlign = TextAlign.Center)
+            Text(stringResource(R.string.ae_otp_customer_sub, Masking.mobile(mobile)), style = AslTheme.type.caption, color = c.textSecondary, textAlign = TextAlign.Center)
+            OtpInput(otp, onOtp, length = 6, autoFocus = true)
+            ErrorBanner(error, null)
+            ResendRow(resendIn, onResend)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(AslIcons.Lock, null, tint = c.textSecondary, modifier = Modifier.size(13.dp))
+                Text(stringResource(R.string.ae_otp_secure_note), style = AslTheme.type.caption, color = c.textSecondary, textAlign = TextAlign.Center)
+            }
+        }
+    }
+}
+
 @Composable
 private fun ScanCard(title: String, subtitle: String, device: RdDevice?, onChangeScanner: () -> Unit) {
     val c = AslTheme.colors
@@ -558,7 +578,7 @@ fun AepsTransactionScreen(
         vm.again(q.type)                       // keep customer + bank, switch type, clear amount
         if (q.type.needsAmount) vm.onAmount(amt)
         quick = null
-        if (vm.onScanPressed()) scan()         // validates; above ₹5,000 it routes to the customer OTP first
+        if (vm.onScanPressed()) scan()         // validates; above ₹4,000 it routes to the customer OTP first
     }
 
     when (s.phase) {
@@ -572,15 +592,12 @@ fun AepsTransactionScreen(
             onWithdraw = { quick = QuickReq(TxnType.Withdraw, retry = false) },
             onTryAgain = { quick = QuickReq(s.type, retry = true) })
         TxnPhase.CustomerOtp -> AepsScaffold(title, vm::cancelOtp, right = { ScannerChip(device) { showScanner = true } }, bottom = {
-            AslPrimaryButton(stringResource(R.string.ae_verify_scan), { if (vm.otpEntered()) scan() }, enabled = s.otp.length >= 4, icon = AslIcons.Fingerprint)
+            AslPrimaryButton(stringResource(R.string.ae_verify_scan), { if (vm.otpEntered()) scan() }, enabled = s.otp.length == 6, icon = AslIcons.Fingerprint)
             AslButton(stringResource(R.string.ae_cancel), vm::cancelOtp, Modifier.fillMaxWidth(), style = AslButtonStyle.Outline)
         }) {
             AmountShow(s.amount)
-            Text(stringResource(R.string.ae_otp_customer), style = AslTheme.type.bodyStrong, color = AslTheme.colors.textPrimary)
-            Text(stringResource(R.string.ae_otp_customer_sub, Masking.mobile(s.mobile)), style = AslTheme.type.caption, color = AslTheme.colors.textSecondary)
-            OtpInput(s.otp, vm::onOtp, length = 6)
-            ErrorBanner(s.error, null)
-            ResendRow(s.otpResendIn, vm::requestCustomerOtp)
+            CustomerOtpCard(mobile = s.mobile, otp = s.otp, onOtp = vm::onOtp, error = s.error,
+                resendIn = s.otpResendIn, onResend = vm::requestCustomerOtp)
         }
         TxnPhase.Form -> AepsScaffold(title, onBack, right = { ScannerChip(device) { showScanner = true } }, bottom = {
             AslPrimaryButton(stringResource(R.string.ae_scan_customer), { if (vm.onScanPressed()) scan() }, loading = s.busy, icon = AslIcons.Fingerprint)

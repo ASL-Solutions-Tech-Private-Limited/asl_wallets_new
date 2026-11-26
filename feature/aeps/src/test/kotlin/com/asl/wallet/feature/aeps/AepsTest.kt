@@ -80,12 +80,13 @@ class AepsRulesTest {
         assertThat(status().nextStep(y)).isEqualTo(NextStep.Ready)
     }
 
-    @Test fun `deposit only for Yes Bank, no Aadhaar Pay, OTP only above 5000 withdrawal`() {
+    @Test fun `deposit only for Yes Bank, no Aadhaar Pay, OTP only above 4000 withdrawal`() {
         assertThat(TxnType.forProvider(AepsProvider.Kotak)).containsExactly(TxnType.Withdraw, TxnType.Balance, TxnType.Statement, TxnType.Deposit).inOrder()
         assertThat(TxnType.forProvider(AepsProvider.YesBank)).contains(TxnType.Deposit)
         assertThat(TxnType.entries.map { it.code }).doesNotContain("ADHPAY")
-        assertThat(TxnType.Withdraw.needsCustomerOtp(BigDecimal(5000))).isFalse()
-        assertThat(TxnType.Withdraw.needsCustomerOtp(BigDecimal(5001))).isTrue()
+        assertThat(TxnType.Withdraw.needsCustomerOtp(BigDecimal(4000))).isFalse()
+        assertThat(TxnType.Withdraw.needsCustomerOtp(BigDecimal(4001))).isTrue()
+        assertThat(TxnType.Withdraw.needsCustomerOtp(BigDecimal(5000))).isTrue()
         assertThat(TxnType.Deposit.needsCustomerOtp(BigDecimal(9000))).isFalse()
     }
 

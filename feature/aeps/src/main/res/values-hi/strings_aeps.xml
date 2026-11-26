@@ -133,6 +133,7 @@
     <string name="ae_wallet_note_sub">जमा की रकम आपके ASL वॉलेट से ली जाएगी</string>
     <string name="ae_otp_customer">ग्राहक से OTP पूछें</string>
     <string name="ae_otp_customer_sub">बैंक ने %1$s पर भेजा</string>
+    <string name="ae_otp_secure_note">₹4,000 से अधिक निकासी के लिए आवश्यक (NPCI)</string>
     <string name="ae_cancel">रद्द करें</string>
     <string name="ae_processing">%1$s जारी है</string>
     <string name="ae_p_captured">फ़िंगरप्रिंट मिल गया</string>

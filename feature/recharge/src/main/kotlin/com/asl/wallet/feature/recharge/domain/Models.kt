@@ -18,6 +18,12 @@ data class Plan(val amount: Int, val validity: String, val description: String, 
 
 data class PlanGroup(val name: String, val plans: List<Plan>)
 
+/**
+ * A per-number "R-Offer" (recharge offer) the operator exposes for one customer's mobile. [commission] is the
+ * retailer's earning for that amount, when the operator sends it. Jio has no R-Offers (it uses plans only).
+ */
+data class ROffer(val amount: Int, val description: String, val longDesc: String, val commission: BigDecimal?)
+
 data class DthCustomer(
     val name: String?,
     val pack: String?,
@@ -79,6 +85,9 @@ object RechargeRules {
 
     /** Recharges are whole rupees. */
     fun amountOf(text: String): Int? = text.trim().toIntOrNull()?.takeIf { it in MIN_AMOUNT..MAX_AMOUNT }
+
+    /** R-Offers show for every mobile operator except Jio (matches the old app: Jio only has plans). */
+    fun hasROffers(operator: Operator): Boolean = "jio" !in operator.name.lowercase()
 
     /** Mobile numbers typed or picked from contacts: "+91 97987-43077" → "9798743077". */
     fun cleanMobile(raw: String): String {

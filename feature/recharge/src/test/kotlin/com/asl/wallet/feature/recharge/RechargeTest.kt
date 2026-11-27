@@ -12,6 +12,7 @@ import com.asl.wallet.feature.recharge.data.readDthAnswer
 import com.asl.wallet.feature.recharge.data.readDthCustomer
 import com.asl.wallet.feature.recharge.data.readOperators
 import com.asl.wallet.feature.recharge.data.readPlans
+import com.asl.wallet.feature.recharge.data.readROffers
 import com.asl.wallet.feature.recharge.data.shortOperator
 import com.asl.wallet.feature.recharge.data.toRecent
 import com.asl.wallet.feature.recharge.domain.DetectedOperator
@@ -20,6 +21,7 @@ import com.asl.wallet.feature.recharge.domain.Operator
 import com.asl.wallet.feature.recharge.domain.OperatorLists
 import com.asl.wallet.feature.recharge.domain.Plan
 import com.asl.wallet.feature.recharge.domain.PlanGroup
+import com.asl.wallet.feature.recharge.domain.ROffer
 import com.asl.wallet.feature.recharge.domain.RecentRecharge
 import com.asl.wallet.feature.recharge.domain.RechargeOutcome
 import com.asl.wallet.feature.recharge.domain.RechargeReceipt
@@ -121,6 +123,33 @@ class RechargeMappingTest {
         assertThat(groups[1].plans.map { it.amount }).containsExactly(299, 349).inOrder()
         assertThat(groups[0].plans[0].description).isEqualTo("3 GB")
         assertThat(groups[0].plans[0].validity).isEqualTo("3 days")
+    }
+
+    @Test fun `R-Offers are read from an array or a wrapped object, sorted and bounded`() {
+        // Old-app shape: data is an array of {amount, description, long_desc, commission}.
+        val arr = readROffers(json.parseToJsonElement("""[
+            {"amount":"239","description":"Full talktime","long_desc":"Rs 239 FTT http://x","commission":"8.50"},
+            {"amount":19,"description":"Top up","long_desc":"","commission":"0.3"},
+            {"amount":"0","description":"bad"},{"amount":"abc","description":"bad"}]"""))
+        assertThat(arr.map { it.amount }).containsExactly(19, 239).inOrder()
+        val top = arr.first { it.amount == 239 }
+        assertThat(top.longDesc).isEqualTo("Rs 239 FTT")
+        assertThat(top.commission).isEqualTo(BigDecimal("8.50"))
+        // Some providers wrap the list; long_desc falls back to description when blank.
+        val wrapped = readROffers(json.parseToJsonElement("""{"data":[{"amount":49,"description":"SMS pack"}]}"""))
+        assertThat(wrapped).containsExactly(ROffer(49, "SMS pack", "SMS pack", null))
+        // Real API shape (27 Nov): envelope data is {status, operator, circle, message, data:[...]} and the sample
+        // sends empty-string placeholders, which are dropped (amount can't be parsed).
+        val real = readROffers(json.parseToJsonElement("""{"status":"success","operator":"","circle":"West Bengal","message":"Offer Successfully Checked",
+            "data":[{"amount":"","description":"","long_desc":"","commission":""},{"amount":"49","description":"SMS 500","long_desc":"500 SMS","commission":"1.2"}]}"""))
+        assertThat(real).containsExactly(ROffer(49, "SMS 500", "500 SMS", BigDecimal("1.2")))
+    }
+
+    @Test fun `every operator except Jio has R-Offers`() {
+        assertThat(RechargeRules.hasROffers(Operator("1", "Airtel"))).isTrue()
+        assertThat(RechargeRules.hasROffers(Operator("2", "Vi"))).isTrue()
+        assertThat(RechargeRules.hasROffers(Operator("56", "Jio"))).isFalse()
+        assertThat(RechargeRules.hasROffers(Operator("57", "RELIANCE JIO"))).isFalse()
     }
 
     @Test fun `operator names are short and the undocumented list keys are all read`() {
@@ -260,6 +289,8 @@ private class FakeRepo : RechargeRepository {
     override suspend fun operators() = NetworkResult.Success(lists, null)
     override suspend fun detect(mobile: String) = detected
     override suspend fun plans(operator: Operator): NetworkResult<List<PlanGroup>> = NetworkResult.Success(listOf(PlanGroup("Unlimited", listOf(Plan(349, "28 days", "2GB/day", "Unlimited")))), null)
+    var roffers: NetworkResult<List<ROffer>> = NetworkResult.Success(listOf(ROffer(239, "Full talktime", "Rs 239 full talktime", BigDecimal("8.5"))), null)
+    override suspend fun roffers(operator: Operator, mobile: String): NetworkResult<List<ROffer>> = roffers
     var dthResult: NetworkResult<DthCustomer?> = NetworkResult.Success(null, null)
     override suspend fun dthInfo(operator: Operator, subscriberId: String): NetworkResult<DthCustomer?> { dthCalls++; return dthResult }
     override suspend fun recharge(input: RechargeInput): RechargeOutcome { sent += input; return outcome(input) }

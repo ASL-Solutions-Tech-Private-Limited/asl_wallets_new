@@ -101,7 +101,9 @@ import com.asl.wallet.core.security.ui.findActivity
 import com.asl.wallet.feature.recharge.R
 import com.asl.wallet.feature.recharge.domain.Operator
 import com.asl.wallet.feature.recharge.domain.Plan
+import com.asl.wallet.feature.recharge.domain.ROffer
 import com.asl.wallet.feature.recharge.domain.RechargeOutcome
+import com.asl.wallet.feature.recharge.domain.RechargeRules
 import com.asl.wallet.feature.recharge.domain.RechargeReceipt
 import com.asl.wallet.feature.recharge.domain.RechargeStatus
 import com.asl.wallet.feature.recharge.domain.RechargeType
@@ -183,6 +185,7 @@ fun RechargeScreen(
     when (s.page) {
         Page.Form -> FormPage(s, vm, onBack)
         Page.Plans -> { BackHandler(onBack = vm::closePlans); PlansPage(s, vm) }
+        Page.ROffers -> { BackHandler(onBack = vm::closeROffers); ROffersPage(s, vm) }
         Page.Review -> { BackHandler(onBack = vm::backToForm); ReviewPage(s, vm, onAddMoney, onFundRequest) }
         Page.Processing -> {
             SecureScreen()
@@ -269,6 +272,8 @@ private fun MobileFields(s: RechargeState, vm: RechargeViewModel, onPickContact:
             error = if (s.showErrors && s.amount == null) stringResource(R.string.r_amount_bad) else null)
         s.plan?.let { p -> AlertBanner(AlertKind.Info, stringResource(R.string.r_plan_line, rupees(p.amount), p.validity), message = p.description.lineSequence().firstOrNull()) }
         AslButton(stringResource(R.string.r_browse_plans), vm::openPlans, Modifier.fillMaxWidth(), style = AslButtonStyle.Outline, icon = AslIcons.Search)
+        // R-Offer: every mobile operator except Jio exposes per-number offers.
+        s.operator?.let { op -> if (RechargeRules.hasROffers(op)) AslButton(stringResource(R.string.r_roffers), vm::openROffers, Modifier.fillMaxWidth(), style = AslButtonStyle.Outline, icon = AslIcons.Star) }
         Note(stringResource(R.string.r_or_type))
     }
 }
@@ -401,6 +406,55 @@ private fun PlanCard(p: Plan, onClick: () -> Unit) {
             }
             Text(stringResource(R.string.r_validity, p.validity), style = AslTheme.type.label, color = c.textPrimary)
             Text(p.description, style = AslTheme.type.caption, color = c.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+// ---------------------------------------------------------------- R-Offers (per-number offers, every operator except Jio)
+
+@Composable
+private fun ROffersPage(s: RechargeState, vm: RechargeViewModel) {
+    val c = AslTheme.colors
+    var details by remember { mutableStateOf<ROffer?>(null) }
+    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding().keyboardAware()) {
+        AslTopBar(stringResource(R.string.r_roffers_title, s.operator?.name.orEmpty()), onBack = vm::closeROffers)
+        Note(stringResource(R.string.r_roffers_for, Masking.mobile(s.number)))
+        when {
+            s.roffersLoading -> Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) { repeat(5) { SkeletonRow() } }
+            s.roffersError != null -> Column(Modifier.padding(16.dp)) {
+                StateView(AslIcons.WifiOff, StatePresets.offlineColors, stringResource(R.string.r_roffers_error), errorText(s.roffersError)) {
+                    AslPrimaryButton(stringResource(R.string.r_try_again), vm::retryROffers, icon = AslIcons.Refresh)
+                }
+            }
+            s.roffers.isEmpty() -> Column(Modifier.padding(16.dp)) { Note(stringResource(R.string.r_no_roffers)) }
+            else -> LazyColumn(Modifier.fillMaxWidth().imePadding().navigationBarsPadding(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(s.roffers, key = { "${it.amount}-${it.description}" }) { o -> ROfferCard(o, onClick = { details = o }) }
+            }
+        }
+    }
+    details?.let { o ->
+        Sheet({ details = null }) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(rupees(o.amount), style = AslTheme.type.amountDisplay, color = c.textPrimary, modifier = Modifier.weight(1f))
+                o.commission?.let { StatusPill(stringResource(R.string.r_commission, rupees(it)), Status.Success) }
+            }
+            if (o.description.isNotBlank()) Text(o.description, style = AslTheme.type.bodyStrong, color = c.textPrimary)
+            Text(o.longDesc.ifBlank { o.description }, style = AslTheme.type.body, color = c.textPrimary, modifier = Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()))
+            AslPrimaryButton(stringResource(R.string.r_use_offer), { details = null; vm.pickROffer(o) })
+        }
+    }
+}
+
+@Composable
+private fun ROfferCard(o: ROffer, onClick: () -> Unit) {
+    val c = AslTheme.colors
+    Box(Modifier.fillMaxWidth().background(c.surface, AslShapes.card).border(1.dp, c.outline, AslShapes.card).clickable(role = Role.Button, onClick = onClick).padding(14.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(rupees(o.amount), style = AslTheme.type.bodyStrong, color = c.textPrimary, modifier = Modifier.weight(1f))
+                o.commission?.let { Text(stringResource(R.string.r_commission, rupees(it)), style = AslTheme.type.label, color = c.primary) }
+            }
+            if (o.description.isNotBlank()) Text(o.description, style = AslTheme.type.caption, color = c.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
     }
 }

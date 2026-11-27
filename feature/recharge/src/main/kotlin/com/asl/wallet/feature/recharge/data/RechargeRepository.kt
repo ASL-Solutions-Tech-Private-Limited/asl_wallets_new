@@ -11,6 +11,7 @@ import com.asl.wallet.feature.recharge.domain.Operator
 import com.asl.wallet.feature.recharge.domain.OperatorLists
 import com.asl.wallet.feature.recharge.domain.Plan
 import com.asl.wallet.feature.recharge.domain.PlanGroup
+import com.asl.wallet.feature.recharge.domain.ROffer
 import com.asl.wallet.feature.recharge.domain.RecentRecharge
 import com.asl.wallet.feature.recharge.domain.RechargeOutcome
 import com.asl.wallet.feature.recharge.domain.RechargeReceipt
@@ -23,8 +24,10 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.put
 import java.math.BigDecimal
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -44,6 +47,8 @@ interface RechargeRepository {
     suspend fun operators(): NetworkResult<OperatorLists>
     suspend fun detect(mobile: String): NetworkResult<DetectedOperator?>
     suspend fun plans(operator: Operator): NetworkResult<List<PlanGroup>>
+    /** Per-number R-Offers (every mobile operator except Jio). */
+    suspend fun roffers(operator: Operator, mobile: String): NetworkResult<List<ROffer>>
     suspend fun dthInfo(operator: Operator, subscriberId: String): NetworkResult<DthCustomer?>
     /** Never throws and never retries: a timeout or 5xx is [RechargeOutcome.Pending]. */
     suspend fun recharge(input: RechargeInput): RechargeOutcome
@@ -55,6 +60,7 @@ interface RechargeRepository {
 class RechargeRepositoryImpl @Inject constructor(private val api: RechargeApi, private val json: Json) : RechargeRepository {
     @Volatile private var operators: OperatorLists? = null
     private val planCache = HashMap<String, List<PlanGroup>>()
+    private val rofferCache = HashMap<String, List<ROffer>>()
 
     override suspend fun operators(): NetworkResult<OperatorLists> {
         operators?.let { return NetworkResult.Success(it, null) }
@@ -75,6 +81,19 @@ class RechargeRepositoryImpl @Inject constructor(private val api: RechargeApi, p
         synchronized(planCache) { planCache[operator.code] }?.let { return NetworkResult.Success(it, null) }
         return safeApiCall(json) { api.plans(PlansRequest(operator.code)) }.map { readPlans(it) }
             .also { r -> if (r is NetworkResult.Success && r.data.isNotEmpty()) synchronized(planCache) { planCache[operator.code] = r.data } }
+    }
+
+    override suspend fun roffers(operator: Operator, mobile: String): NetworkResult<List<ROffer>> {
+        val code = operator.code.trim()
+        val cacheKey = "$code|${mobile.trim()}"
+        synchronized(rofferCache) { rofferCache[cacheKey] }?.let { return NetworkResult.Success(it, null) }
+        val body = buildJsonObject {
+            put("custmob", mobile.trim())
+            // optcode goes as a number when numeric, matching the API sample ({"optcode":57}); else as text.
+            code.toIntOrNull()?.let { put("optcode", it) } ?: put("optcode", code)
+        }
+        return safeApiCall(json) { api.roffers(body) }.map { readROffers(it) }
+            .also { r -> if (r is NetworkResult.Success && r.data.isNotEmpty()) synchronized(rofferCache) { rofferCache[cacheKey] = r.data } }
     }
 
     override suspend fun dthInfo(operator: Operator, subscriberId: String): NetworkResult<DthCustomer?> =
@@ -178,6 +197,26 @@ internal fun readPlans(o: JsonObject): List<PlanGroup> {
         }
     }
     return RechargeRules.group(plans)
+}
+
+/**
+ * R-Offers answer: usually `data` is an array of {amount, description, long_desc, commission}; some providers wrap it
+ * as `{data:[...]}` or `{records:[...]}`. Read leniently so the path/shape can be confirmed when the API is shared.
+ */
+internal fun readROffers(e: JsonElement): List<ROffer> {
+    val arr = when (e) {
+        is JsonArray -> e
+        is JsonObject -> (e["data"] as? JsonArray) ?: (e["records"] as? JsonArray) ?: (e["ro"] as? JsonArray) ?: JsonArray(emptyList())
+        else -> JsonArray(emptyList())
+    }
+    return arr.mapNotNull { item ->
+        val o = item as? JsonObject ?: return@mapNotNull null
+        val amount = (o["amount"] as? JsonPrimitive)?.let { it.intOrNull ?: it.contentOrNull?.replace(",", "")?.trim()?.toBigDecimalOrNull()?.toInt() } ?: return@mapNotNull null
+        if (amount !in RechargeRules.MIN_AMOUNT..RechargeRules.MAX_AMOUNT) return@mapNotNull null
+        val desc = RechargeRules.cleanText(o.str("description", "desc", "offer") ?: "")
+        val long = RechargeRules.cleanText(o.str("long_desc", "longdesc", "longDesc", "detail") ?: "").ifBlank { desc }
+        ROffer(amount, desc, long, o.str("commission", "comm")?.replace(",", "")?.toBigDecimalOrNull())
+    }.distinctBy { it.amount to it.description }.sortedBy { it.amount }
 }
 
 /** Case-insensitive lookup: providers spell keys as CustomerName / customerName / customer_name. */

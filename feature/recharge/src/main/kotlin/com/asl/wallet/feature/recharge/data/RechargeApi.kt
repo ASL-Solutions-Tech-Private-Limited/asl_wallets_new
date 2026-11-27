@@ -28,6 +28,13 @@ interface RechargeApi {
     suspend fun plans(@Body body: PlansRequest): Response<ApiEnvelope<JsonObject>>
 
     /**
+     * R-Offers for one customer number (every operator except Jio). Body: {custmob, optcode} where optcode is a
+     * number (API sample 27 Nov 2026). Answers `data:{..., data:[{amount, description, long_desc, commission}]}`.
+     */
+    @POST("merchant/recharge/mobile/roffer")
+    suspend fun roffers(@Body body: JsonObject): Response<ApiEnvelope<JsonElement>>
+
+    /**
      * DTH customer details for a subscriber ID (shared by the backend 5 Nov 2026). Answers 200 with
      * `data: {error, DATA, Message}`: error "0" = found, "1" = bad ID (Message says why), "3" / "DOWN" = provider down.
      */

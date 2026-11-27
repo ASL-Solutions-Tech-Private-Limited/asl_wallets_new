@@ -14,6 +14,7 @@ import com.asl.wallet.feature.recharge.domain.Operator
 import com.asl.wallet.feature.recharge.domain.OperatorLists
 import com.asl.wallet.feature.recharge.domain.Plan
 import com.asl.wallet.feature.recharge.domain.PlanGroup
+import com.asl.wallet.feature.recharge.domain.ROffer
 import com.asl.wallet.feature.recharge.domain.RecentRecharge
 import com.asl.wallet.feature.recharge.domain.RechargeOutcome
 import com.asl.wallet.feature.recharge.domain.RechargeRules
@@ -38,7 +39,7 @@ data class RechargeConfig(
     val dthInfoEnabled: Boolean,
 )
 
-enum class Page { Form, Plans, Review, Processing, Result }
+enum class Page { Form, Plans, ROffers, Review, Processing, Result }
 
 sealed interface Detect {
     data object Idle : Detect
@@ -76,6 +77,9 @@ data class RechargeState(
     val plansError: UiError? = null,
     val planQuery: String = "",
     val planGroup: Int = 0,
+    val roffers: List<ROffer> = emptyList(),
+    val roffersLoading: Boolean = false,
+    val roffersError: UiError? = null,
     val dth: DthInfo = DthInfo.Idle,
     val customerName: String = "",
     val balance: BigDecimal? = null,
@@ -144,7 +148,9 @@ class RechargeViewModel @Inject constructor(
             it.copy(number = v, showErrors = false, dth = DthInfo.Idle,
                 operator = if (it.type == RechargeType.Mobile) null else it.operator,
                 detect = if (it.type == RechargeType.Mobile) Detect.Idle else it.detect,
-                plan = if (it.type == RechargeType.Mobile) null else it.plan)
+                plan = if (it.type == RechargeType.Mobile) null else it.plan,
+                roffers = if (it.type == RechargeType.Mobile) emptyList() else it.roffers,
+                roffersError = if (it.type == RechargeType.Mobile) null else it.roffersError)
         }
         if (s.type == RechargeType.Mobile && RechargeRules.isNumberOk(RechargeType.Mobile, v)) detect(v)
     }
@@ -171,6 +177,7 @@ class RechargeViewModel @Inject constructor(
         detectJob?.cancel()
         _state.update {
             it.copy(operator = op, plan = if (it.operator?.code == op.code) it.plan else null, plans = if (it.operator?.code == op.code) it.plans else emptyList(),
+                roffers = if (it.operator?.code == op.code) it.roffers else emptyList(), roffersError = if (it.operator?.code == op.code) it.roffersError else null,
                 dth = DthInfo.Idle, detect = if (it.type == RechargeType.Mobile && it.detect !is Detect.Found) Detect.Found(null) else it.detect)
         }
     }
@@ -202,6 +209,28 @@ class RechargeViewModel @Inject constructor(
     fun onPlanGroup(i: Int) = _state.update { it.copy(planGroup = i, planQuery = "") }
     fun pickPlan(p: Plan) = _state.update { it.copy(plan = p, amountText = p.amount.toString(), page = Page.Form) }
     fun closePlans() = _state.update { it.copy(page = Page.Form) }
+
+    // ------------------------------------------------------------ R-Offers (every mobile operator except Jio)
+
+    fun openROffers() {
+        val s = _state.value
+        val op = s.operator ?: return
+        if (!s.numberOk) return
+        _state.update { it.copy(page = Page.ROffers) }
+        if (_state.value.roffers.isNotEmpty()) return
+        _state.update { it.copy(roffersLoading = true, roffersError = null) }
+        viewModelScope.launch {
+            when (val r = repo.roffers(op, s.number)) {
+                is NetworkResult.Success -> _state.update { it.copy(roffersLoading = false, roffers = r.data) }
+                is NetworkResult.Failure -> _state.update { it.copy(roffersLoading = false, roffersError = r.toUiError()) }
+            }
+        }
+    }
+
+    fun retryROffers() { _state.update { it.copy(roffers = emptyList()) }; openROffers() }
+    /** An R-Offer just fills the amount; it isn't a plan, so any chosen plan is cleared. */
+    fun pickROffer(o: ROffer) = _state.update { it.copy(amountText = o.amount.toString(), plan = null, page = Page.Form) }
+    fun closeROffers() = _state.update { it.copy(page = Page.Form) }
 
     // ------------------------------------------------------------ DTH details
 

@@ -56,6 +56,13 @@
     <string name="r_choose">Choose</string>
     <string name="r_choose_plan">Choose this plan</string>
     <string name="r_validity">Validity %1$s</string>
+    <string name="r_roffers">R-Offer</string>
+    <string name="r_roffers_title">%1$s R-Offers</string>
+    <string name="r_roffers_for">Offers for %1$s</string>
+    <string name="r_roffers_error">Couldn\'t load R-Offers</string>
+    <string name="r_no_roffers">No R-Offers for this number. Type the amount instead.</string>
+    <string name="r_use_offer">Use this offer</string>
+    <string name="r_commission">Comm. %1$s</string>
     <string name="r_review">Review</string>
     <string name="r_checking_balance">Checking wallet balance</string>
     <string name="r_add_money">Add money</string>

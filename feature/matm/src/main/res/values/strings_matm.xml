@@ -15,6 +15,8 @@
     <string name="m_err_amount">Enter a valid amount</string>
 
     <string name="m_location_hint">Turn on location — Micro ATM transactions must be tagged with your location.</string>
+    <string name="m_location_denied">Location permission is required for Micro ATM. Please allow it to continue.</string>
+    <string name="m_location_unavailable">Could not read your location. Turn on GPS/location and try again.</string>
     <string name="m_device_note">Keep the card reader paired and charged. The customer taps/dips the card and enters their PIN on the reader.</string>
     <string name="m_cancelled">Transaction cancelled.</string>
 

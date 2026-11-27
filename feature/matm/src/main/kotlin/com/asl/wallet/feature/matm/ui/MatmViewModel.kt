@@ -71,6 +71,9 @@ class MatmViewModel @Inject constructor(
     fun clearBanner() = _state.update { it.copy(banner = null, bannerRes = null) }
     fun launchConsumed() = _state.update { it.copy(launch = null) }
 
+    /** The screen asked for location permission and the retailer declined. */
+    fun onLocationDenied() = _state.update { it.copy(busy = false, bannerRes = R.string.m_location_denied) }
+
     fun submit() {
         val s = _state.value
         if (s.busy) return
@@ -89,7 +92,14 @@ class MatmViewModel @Inject constructor(
         }
         _state.update { it.copy(busy = true, banner = null, bannerRes = null) }
         viewModelScope.launch {
+            // mATM is geo-tagged: never initiate without real coordinates. If we cannot get a
+            // fix (permission missing, GPS off, no fix), stop and tell the retailer rather than
+            // sending 0,0 to the backend.
             val at = runCatching { location.current() }.getOrNull()
+            if (at == null) {
+                _state.update { it.copy(busy = false, bannerRes = R.string.m_location_unavailable) }
+                return@launch
+            }
             when (val r = repo.initiate(f.type, f.mobile, amount, attemptKey)) {
                 is NetworkResult.Success -> _state.update { it.copy(busy = false, launch = LaunchRequest(r.data, at)) }
                 is NetworkResult.Failure -> _state.update { it.copy(busy = false, banner = errorText(r)) }

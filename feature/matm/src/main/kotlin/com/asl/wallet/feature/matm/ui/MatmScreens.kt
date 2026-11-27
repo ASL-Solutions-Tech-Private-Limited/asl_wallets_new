@@ -1,5 +1,8 @@
 package com.asl.wallet.feature.matm.ui
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -52,6 +55,16 @@ fun MatmTransactionScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     val launch = rememberMatmLauncher(vm::onDeviceResult)
 
+    // mATM transactions must be geo-tagged. If location permission is already granted we submit
+    // straight away; otherwise the CTA asks for it first and submits only once granted.
+    val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
+        if (grants.values.any { it }) vm.submit() else vm.onLocationDenied()
+    }
+    val onSubmit: () -> Unit = {
+        if (vm.hasLocationPermission) vm.submit()
+        else locationPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+    }
+
     // When the server returns the credentials, open the card reader (once).
     LaunchedEffect(state.launch) {
         state.launch?.let { req -> launch(req.init, req.at); vm.launchConsumed() }
@@ -101,7 +114,7 @@ fun MatmTransactionScreen(
         Column(Modifier.fillMaxWidth().background(c.surface).navigationBarsPadding().padding(16.dp)) {
             AslPrimaryButton(
                 stringResource(if (state.form.type == MatmTxnType.Balance) R.string.m_cta_balance else R.string.m_cta_withdraw),
-                vm::submit, enabled = !state.busy, loading = state.busy, icon = AslIcons.Atm,
+                onSubmit, enabled = !state.busy, loading = state.busy, icon = AslIcons.Atm,
             )
         }
     }
